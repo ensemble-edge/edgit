@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0",
+  "components": {
+    "tkkm7t": {
+      "id": "tkkm7t",
+      "name": "test-name-change-agent",
+      "type": "agent",
+      "path": "test-name-change.js",
+      "version": "1.0.0",
+      "versionHistory": [
+        {
+          "version": "1.0.0",
+          "commit": "e797599e2b33a9b471dca1fea4be7b4600166728",
+          "timestamp": "2025-10-30T23:05:14.465Z",
+          "message": "Initial component registration"
+        }
+      ]
+    }
+  },
+  "updated": "2025-10-30T23:05:14.466Z"
+}
