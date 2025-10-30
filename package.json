@@ -6,11 +6,16 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "git",
+    "versioning",
+    "cli"
+  ],
+  "author": "Ensemble Edge",
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^24.9.2",
     "typescript": "^5.9.3"
-  }
+  },
+  "repository": "https://github.com/ensemble-edge/edgit"
 }
