@@ -3,19 +3,46 @@
   "components": {
     "tkkm7t": {
       "id": "tkkm7t",
-      "name": "test-name-change-agent",
+      "name": "awesome-new-name",
       "type": "agent",
       "path": "test-name-change.js",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "versionHistory": [
         {
           "version": "1.0.0",
           "commit": "e797599e2b33a9b471dca1fea4be7b4600166728",
           "timestamp": "2025-10-30T23:05:14.465Z",
           "message": "Initial component registration"
+        },
+        {
+          "version": "1.0.1",
+          "commit": "7f1c738d4eaed4ef2967d46b685f56d849ad5270",
+          "timestamp": "2025-10-30T23:06:21.380Z",
+          "message": "Test name change detection"
+        }
+      ]
+    },
+    "awesome-new-name": {
+      "id": "tkkm7t",
+      "name": "awesome-new-name",
+      "type": "agent",
+      "path": "test-name-change.js",
+      "version": "1.0.1",
+      "versionHistory": [
+        {
+          "version": "1.0.0",
+          "commit": "e797599e2b33a9b471dca1fea4be7b4600166728",
+          "timestamp": "2025-10-30T23:05:14.465Z",
+          "message": "Initial component registration"
+        },
+        {
+          "version": "1.0.1",
+          "commit": "7f1c738d4eaed4ef2967d46b685f56d849ad5270",
+          "timestamp": "2025-10-30T23:06:21.380Z",
+          "message": "Test name change detection"
         }
       ]
     }
   },
-  "updated": "2025-10-30T23:05:14.466Z"
+  "updated": "2025-10-30T23:06:21.390Z"
 }
