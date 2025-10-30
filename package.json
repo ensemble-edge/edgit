@@ -18,5 +18,8 @@
     "@types/node": "^24.9.2",
     "typescript": "^5.9.3"
   },
-  "repository": "https://github.com/ensemble-edge/edgit"
+  "repository": "https://github.com/ensemble-edge/edgit",
+  "publishConfig": {
+    "access": "public"
+  }
 }
