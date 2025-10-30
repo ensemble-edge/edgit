@@ -1,11 +1,16 @@
 {
   "name": "@ensemble-edge/edgit",
   "version": "0.0.2",
+  "type": "module",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "bin": {
+    "edgit": "dist/index.js"
+  },
   "scripts": {
     "test": "echo 'tests pass'",
-    "build": "tsc"
+    "build": "tsc",
+    "dev": "tsc && node"
   },
   "keywords": [
     "git",
