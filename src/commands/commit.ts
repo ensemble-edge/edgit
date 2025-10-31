@@ -3,16 +3,14 @@ import * as path from 'path';
 import { Command } from './base.js';
 import { GitWrapper } from '../utils/git.js';
 import { ComponentDetector } from '../utils/component-detector.js';
-import { fileHeaderManager } from '../utils/file-headers.js';
-import { ComponentNameGenerator } from '../utils/component-name-generator.js';
 import { AICommitManager } from '../utils/ai-commit.js';
-import { ChangelogManager, type ComponentVersionChange } from '../utils/changelog.js';
-import type { ComponentRegistry, Component, ComponentVersion, ComponentType } from '../models/components.js';
+import type { ComponentRegistry, ComponentType } from '../models/components.js';
 import type { ComponentChange } from '../types/ai-commit.js';
-import { SemVer, ComponentUtils } from '../models/components.js';
+import { ComponentUtils } from '../models/components.js';
 
 /**
- * CommitCommand intercepts git commit to auto-version changed components
+ * CommitCommand for Git tag-based system
+ * Keeps AI commit features but removes version bumping logic
  */
 export class CommitCommand extends Command {
   private static readonly EDGIT_DIR = '.edgit';
@@ -42,618 +40,124 @@ export class CommitCommand extends Command {
 
       const { flags, options } = this.parseArgs(args);
       
-      // Parse commit message to determine version bump strategy
+      // Parse commit message
       const commitMessage = options.m || options.message;
-      const bumpStrategy = this.parseBumpStrategy(commitMessage, flags);
 
-      // Detect changed components
+      // Detect changed components (for AI context only)
       const changedComponents = await this.detectChangedComponents();
       
       if (changedComponents.length === 0) {
-        this.showInfo('No component changes detected. Proceeding with normal commit.');
+        // No component changes, pass through to normal git commit
         await this.git.passthrough(['commit', ...args]);
         return;
       }
 
-      // Load components registry
+      // Load registry for AI configuration
       const registry = await this.loadComponentsRegistry();
 
-      // Version the changed components
-      const versionedComponents = await this.versionComponents(
-        registry, 
-        changedComponents, 
-        bumpStrategy,
-        commitMessage
-      );
-
-      if (versionedComponents.length > 0) {
-        // HYBRID VERSIONING: Sync file headers before commit
-        for (const versionedComponent of versionedComponents) {
-          const component = ComponentUtils.findComponentByName(registry, versionedComponent.name);
-          if (component) {
-            await this.syncFileHeader(component);
-          }
-        }
-
-        // Save updated registry
-        await this.saveComponentsRegistry(registry);
-
-        // Stage the components.json file
-        const componentsFile = await this.getComponentsFilePath();
-        await this.git.add([componentsFile]);
-
-        this.showInfo(`Auto-versioned ${versionedComponents.length} components`);
-      }
-
       // Generate AI commit message if needed
-      let finalGitArgs = this.filterGitArgs(args);
+      let finalGitArgs = [...args];
       finalGitArgs = await this.enhanceWithAICommitMessage(
-        finalGitArgs, 
-        commitMessage, 
-        changedComponents, 
+        finalGitArgs,
+        commitMessage,
+        changedComponents,
         registry
       );
 
-      // Proceed with git commit (filter out edgit-specific flags)
+      // Execute git commit
       await this.git.passthrough(['commit', ...finalGitArgs]);
 
-      // Update changelog after successful commit
-      if (versionedComponents.length > 0) {
-        await this.updateChangelog(versionedComponents, commitMessage || '', registry);
-      }
-
-      // Show versioning summary after successful commit
-      if (versionedComponents.length > 0) {
-        await this.showVersioningSummary(versionedComponents);
+      // Show summary of changed components (without versioning)
+      if (changedComponents.length > 0) {
+        await this.showComponentsSummary(changedComponents);
       }
 
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      this.showError(`Commit failed: ${message}`, [
-        'Check that all files are properly staged',
-        'Ensure commit message is provided',
-        'Run "edgit setup" if component tracking is not initialized'
-      ]);
+      this.showError(`Commit failed: ${message}`);
       throw error;
     }
   }
 
-  private async isEdgitInitialized(): Promise<boolean> {
+  /**
+   * Detect changed components in staging area
+   */
+  private async detectChangedComponents(): Promise<Array<{
+    type: ComponentType;
+    name: string;
+    path: string;
+    action: 'added' | 'modified' | 'deleted';
+  }>> {
+    if (!this.detector) {
+      return [];
+    }
+
     try {
-      await this.loadComponentsRegistry();
+      // Get staged files
+      const stagedFiles = await this.git.getStagedFiles();
+      
+      if (stagedFiles.length === 0) {
+        return [];
+      }
+
+      // Load registry to know which files are components
+      const registry = await this.loadComponentsRegistry();
+      const componentEntries = ComponentUtils.getAllComponents(registry);
+      
+      const changedComponents: Array<{
+        type: ComponentType;
+        name: string;
+        path: string;
+        action: 'added' | 'modified' | 'deleted';
+      }> = [];
+
+      // Check which staged files correspond to registered components
+      for (const stagedFile of stagedFiles) {
+        for (const { name, component } of componentEntries) {
+          if (component.path === stagedFile) {
+            // Determine action based on file status
+            const status = await this.git.getStatus();
+            let action: 'added' | 'modified' | 'deleted' = 'modified';
+            
+            if (status.staged.includes(stagedFile)) {
+              // File is in staging - check if it's new or modified
+              const fileExists = await this.fileExists(stagedFile);
+              action = fileExists ? 'modified' : 'added';
+            }
+            
+            changedComponents.push({
+              type: component.type,
+              name,
+              path: component.path,
+              action
+            });
+            break;
+          }
+        }
+      }
+
+      return changedComponents;
+
+    } catch (error) {
+      console.warn(`Warning: Could not detect changed components: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return [];
+    }
+  }
+
+  /**
+   * Check if a file exists in the working directory
+   */
+  private async fileExists(filePath: string): Promise<boolean> {
+    try {
+      const repoRoot = await this.git.getRepoRoot();
+      if (!repoRoot) return false;
+      
+      const fullPath = path.join(repoRoot, filePath);
+      await fs.access(fullPath);
       return true;
     } catch {
       return false;
     }
-  }
-
-  private async loadComponentsRegistry(): Promise<ComponentRegistry> {
-    const repoRoot = await this.git.getRepoRoot();
-    if (!repoRoot) {
-      throw new Error('Not in a git repository');
-    }
-
-    const componentsFile = path.join(repoRoot, CommitCommand.EDGIT_DIR, CommitCommand.COMPONENTS_FILE);
-    
-    try {
-      const content = await fs.readFile(componentsFile, 'utf8');
-      return JSON.parse(content) as ComponentRegistry;
-    } catch (error) {
-      if ((error as any).code === 'ENOENT') {
-        throw new Error('Edgit not initialized. Run "edgit setup" first.');
-      }
-      throw new Error(`Failed to load components registry: ${error}`);
-    }
-  }
-
-  private async saveComponentsRegistry(registry: ComponentRegistry): Promise<void> {
-    const repoRoot = await this.git.getRepoRoot();
-    if (!repoRoot) {
-      throw new Error('Not in a git repository');
-    }
-
-    const componentsFile = path.join(repoRoot, CommitCommand.EDGIT_DIR, CommitCommand.COMPONENTS_FILE);
-    
-    try {
-      registry.updated = new Date().toISOString();
-      const content = JSON.stringify(registry, null, 2);
-      await fs.writeFile(componentsFile, content, 'utf8');
-    } catch (error) {
-      throw new Error(`Failed to save components registry: ${error}`);
-    }
-  }
-
-  private async getComponentsFilePath(): Promise<string> {
-    const repoRoot = await this.git.getRepoRoot();
-    if (!repoRoot) {
-      throw new Error('Not in a git repository');
-    }
-    return path.join(repoRoot, CommitCommand.EDGIT_DIR, CommitCommand.COMPONENTS_FILE);
-  }
-
-  private parseBumpStrategy(
-    commitMessage?: string, 
-    flags: Record<string, boolean> = {}
-  ): 'major' | 'minor' | 'patch' {
-    // Check explicit flags first
-    if (flags.major) return 'major';
-    if (flags.minor) return 'minor';
-    if (flags.patch) return 'patch';
-
-    // Parse conventional commit patterns
-    if (commitMessage) {
-      const msg = commitMessage.toLowerCase();
-      
-      // Breaking changes
-      if (msg.includes('breaking change') || msg.includes('!')) {
-        return 'major';
-      }
-      
-      // Features
-      if (msg.startsWith('feat') || msg.startsWith('feature')) {
-        return 'minor';
-      }
-      
-      // Bug fixes, docs, etc.
-      if (msg.startsWith('fix') || msg.startsWith('docs') || 
-          msg.startsWith('style') || msg.startsWith('refactor') ||
-          msg.startsWith('test') || msg.startsWith('chore')) {
-        return 'patch';
-      }
-    }
-
-    // Default to patch
-    return 'patch';
-  }
-
-  private async detectChangedComponents(): Promise<{
-    type: ComponentType;
-    name: string;
-    path: string;
-    action: 'added' | 'modified' | 'deleted';
-  }[]> {
-    if (!this.detector) {
-      throw new Error('Component detector not initialized');
-    }
-
-    // Get components detected by patterns
-    const patternBasedComponents = await this.detector.getStagedComponents();
-    
-    // Get components with file headers that might be staged
-    const headerBasedComponents = await this.detectStagedHeaderComponents();
-    
-    // Merge and deduplicate by path
-    const allComponents = [...patternBasedComponents];
-    
-    for (const headerComponent of headerBasedComponents) {
-      const existingIndex = allComponents.findIndex(c => c.path === headerComponent.path);
-      if (existingIndex === -1) {
-        allComponents.push(headerComponent);
-      }
-    }
-    
-    return allComponents;
-  }
-
-  /**
-   * Detect staged components that have file headers (hybrid versioning)
-   */
-  private async detectStagedHeaderComponents(): Promise<{
-    type: ComponentType;
-    name: string;
-    path: string;
-    action: 'added' | 'modified' | 'deleted';
-    componentId?: string;
-  }[]> {
-    const headerComponents: {
-      type: ComponentType;
-      name: string;
-      path: string;
-      action: 'added' | 'modified' | 'deleted';
-      componentId?: string;
-    }[] = [];
-
-    try {
-      // Get list of staged files
-      const result = await this.git.exec(['diff', '--cached', '--name-status']);
-      const stagedFiles = result.stdout.split('\n').filter(line => line.trim());
-
-      for (const line of stagedFiles) {
-        const [status, filePath] = line.split('\t');
-        if (!filePath) continue;
-
-        const action = status === 'A' ? 'added' : 
-                     status === 'D' ? 'deleted' : 'modified';
-
-        if (action === 'deleted') {
-          // For deleted files, we can't read headers, but we might want to track them
-          continue;
-        }
-
-        // Check if file has component header
-        const resolvedPath = this.resolveWorkspacePath(filePath);
-        try {
-          const headerMetadata = await fileHeaderManager.readMetadata(resolvedPath);
-          
-          if (headerMetadata && headerMetadata.component && headerMetadata.version) {
-            // Detect component type - use detector or fallback to analysis
-            const detected = this.detector?.detectComponent(resolvedPath);
-            const componentType = detected?.type || this.inferTypeFromPath(filePath);
-            
-            const componentData: {
-              type: ComponentType;
-              name: string;
-              path: string;
-              action: 'added' | 'modified' | 'deleted';
-              componentId?: string;
-            } = {
-              type: componentType,
-              name: headerMetadata.component,
-              path: filePath,
-              action
-            };
-            
-            if (headerMetadata.componentId) {
-              componentData.componentId = headerMetadata.componentId;
-            }
-            
-            headerComponents.push(componentData);
-          }
-        } catch {
-          // File doesn't have header or can't be read - skip
-        }
-      }
-    } catch (error) {
-      console.warn(`⚠️  Warning: Could not detect header-based components: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-
-    return headerComponents;
-  }
-
-  /**
-   * Infer component type from file path (fallback)
-   */
-  private inferTypeFromPath(filePath: string): ComponentType {
-    const ext = path.extname(filePath).toLowerCase();
-    const basename = path.basename(filePath).toLowerCase();
-    
-    if (ext === '.md' || ext === '.txt' || basename.includes('prompt')) {
-      return 'prompt';
-    }
-    if (ext === '.sql') {
-      return 'sql';
-    }
-    if (ext === '.yaml' || ext === '.yml' || ext === '.json' || basename.includes('config')) {
-      return 'config';
-    }
-    if (ext === '.js' || ext === '.ts' || ext === '.py' || basename.includes('agent')) {
-      return 'agent';
-    }
-    
-    return 'config'; // fallback to config instead of 'component'
-  }
-
-  private async versionComponents(
-    registry: ComponentRegistry,
-    changedComponents: Array<{
-      type: ComponentType;
-      name: string;
-      path: string;
-      action: 'added' | 'modified' | 'deleted';
-      componentId?: string;
-    }>,
-    bumpStrategy: 'major' | 'minor' | 'patch',
-    commitMessage?: string
-  ): Promise<Array<{
-    name: string;
-    oldVersion: string;
-    newVersion: string;
-    action: string;
-  }>> {
-    const versionedComponents: Array<{
-      name: string;
-      oldVersion: string;
-      newVersion: string;
-      action: string;
-    }> = [];
-
-    // Get current commit (will be available after commit)
-    // For now, we'll update this post-commit if needed
-    const currentCommit = await this.git.getCurrentCommit() || 'pending';
-
-    for (const changed of changedComponents) {
-      const componentName = changed.name;
-      const componentId = changed.componentId;
-      
-      if (changed.action === 'deleted') {
-        // For now, we don't remove components from registry on deletion
-        // We could add a 'deleted' flag or special handling here
-        continue;
-      }
-
-      // Look up component by ID first (if available), then by name
-      let component: Component | undefined;
-      let nameChanged = false;
-
-      if (componentId) {
-        // Component has stable ID - look up by ID
-        component = ComponentUtils.findComponentById(registry, componentId);
-        
-        if (component && component.name !== componentName) {
-          // Name changed! User manually edited the header
-          nameChanged = true;
-          console.log(`📝 Detected name change: ${component.name} → ${componentName} (ID: ${componentId})`);
-          
-          // Validate new name is Cloudflare-safe (optional - could be warning only)
-          const validationResult = ComponentNameGenerator.validateWorkerName(componentName);
-          if (!validationResult.valid) {
-            console.warn(`⚠️  Warning: New name "${componentName}" may not be Cloudflare-safe: ${validationResult.errors.join(', ')}`);
-            // You could choose to reject here or just warn
-          }
-          
-          // Check for collisions with other components
-          const existingByName = ComponentUtils.findComponentByName(registry, componentName);
-          if (existingByName && existingByName.id !== componentId) {
-            throw new Error(`❌ Name collision: "${componentName}" is already used by component ${existingByName.id}`);
-          }
-          
-          // Update component name (stays under same ID key)
-          component.name = componentName;
-        }
-      }
-      
-      if (!component) {
-        // Fallback to name lookup (legacy components or new components)
-        component = ComponentUtils.findComponentByName(registry, componentName);
-      }
-      
-      if (!component) {
-        // New component
-        component = {
-          id: ComponentNameGenerator.generateComponentId(),
-          name: componentName,
-          type: changed.type,
-          path: changed.path,
-          version: '1.0.0',
-          versionHistory: []
-        };
-        ComponentUtils.addComponent(registry, component);
-        
-        versionedComponents.push({
-          name: componentName,
-          oldVersion: 'none',
-          newVersion: '1.0.0',
-          action: 'created'
-        });
-      } else {
-        // Existing component - bump version
-        const currentVersion = new SemVer(component.version);
-        let newVersion: SemVer;
-
-        // If name changed, ensure at least a patch bump 
-        // (user might want this to be minor or major depending on their policy)
-        const minimumBump = nameChanged ? 'patch' : bumpStrategy;
-        const effectiveBump = this.getHigherBumpStrategy(bumpStrategy, minimumBump);
-
-        switch (effectiveBump) {
-          case 'major':
-            newVersion = currentVersion.bumpMajor();
-            break;
-          case 'minor':
-            newVersion = currentVersion.bumpMinor();
-            break;
-          case 'patch':
-          default:
-            newVersion = currentVersion.bumpPatch();
-            break;
-        }
-
-        const action = nameChanged ? 'renamed' : 'updated';
-
-        const versionAction = nameChanged ? 'renamed' : 'updated';
-
-        versionedComponents.push({
-          name: componentName,
-          oldVersion: component.version,
-          newVersion: newVersion.toString(),
-          action: versionAction
-        });
-
-        component.version = newVersion.toString();
-      }
-
-      // Add version history entry
-      const versionEntry: ComponentVersion = {
-        version: component!.version, // component is guaranteed to exist here
-        commit: currentCommit,
-        timestamp: new Date().toISOString(),
-        path: component!.path
-      };
-
-      if (commitMessage) {
-        versionEntry.message = commitMessage;
-      }
-
-      component!.versionHistory.push(versionEntry);
-
-      // Note: File header sync happens before commit in main execute method
-    }
-
-    return versionedComponents;
-  }
-
-  /**
-   * Sync component file header with registry version (hybrid versioning)
-   */
-  private async syncFileHeader(component: Component): Promise<void> {
-    try {
-      const filePath = this.resolveWorkspacePath(component.path);
-      
-      // Check if file has existing header
-      const existingHeader = await fileHeaderManager.readMetadata(filePath);
-      
-      if (existingHeader) {
-        // Update existing header with new version AND name
-        await fileHeaderManager.writeMetadata(filePath, {
-          version: component.version,
-          component: component.name,
-          componentId: component.id
-        }, { 
-          replace: true,
-          componentType: component.type
-        });
-      } else {
-        // Create missing header for tracked component
-        await fileHeaderManager.writeMetadata(filePath, {
-          version: component.version,
-          component: component.name,
-          componentId: component.id
-        }, { 
-          replace: false,
-          componentType: component.type
-        });
-      }
-      
-      // Stage the updated file header
-      await this.git.add([component.path]);
-    } catch (error) {
-      // Log warning but don't fail the commit
-      console.warn(`⚠️  Warning: Could not update header for ${component.path}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * Get the higher of two bump strategies (major > minor > patch)
-   */
-  private getHigherBumpStrategy(
-    strategy1: 'major' | 'minor' | 'patch',
-    strategy2: 'major' | 'minor' | 'patch'
-  ): 'major' | 'minor' | 'patch' {
-    const priorities = { major: 3, minor: 2, patch: 1 };
-    return priorities[strategy1] >= priorities[strategy2] ? strategy1 : strategy2;
-  }
-
-  private async showVersioningSummary(
-    versionedComponents: Array<{
-      name: string;
-      oldVersion: string;
-      newVersion: string;
-      action: string;
-    }>
-  ): Promise<void> {
-    console.log('\n🧩 Component Versioning Summary:');
-    
-    for (const comp of versionedComponents) {
-      if (comp.action === 'created') {
-        console.log(`   ✨ ${comp.name}: created v${comp.newVersion}`);
-      } else {
-        console.log(`   📈 ${comp.name}: v${comp.oldVersion} → v${comp.newVersion}`);
-      }
-    }
-
-    console.log('');
-    console.log('💡 Use "edgit components" to see all component versions');
-    console.log('💡 Use "edgit checkout component@version" to restore any version');
-  }
-
-  /**
-   * Update CHANGELOG.md with component version changes
-   */
-  private async updateChangelog(
-    versionedComponents: Array<{
-      name: string;
-      oldVersion: string;
-      newVersion: string;
-      action: string;
-    }>,
-    commitMessage: string,
-    registry: ComponentRegistry
-  ): Promise<void> {
-    try {
-      const repoRoot = await this.git.getRepoRoot();
-      if (!repoRoot) return;
-
-      // Check if changelog updates are enabled
-      const aiConfig = registry.metadata?.config?.ai;
-      if (aiConfig?.mode === 'off') return; // Skip if AI is disabled
-
-      const changelogManager = new ChangelogManager(repoRoot);
-      
-      // Convert versioned components to changelog format
-      const versionChanges: ComponentVersionChange[] = versionedComponents.map(comp => {
-        // Find component to get type
-        const component = ComponentUtils.findComponentByName(registry, comp.name);
-        const componentType = component?.type || 'unknown';
-        
-        return {
-          name: comp.name,
-          type: componentType,
-          oldVersion: comp.oldVersion,
-          newVersion: comp.newVersion,
-          action: comp.action as 'created' | 'updated' | 'renamed' | 'deleted',
-          message: commitMessage
-        };
-      });
-
-      // Generate AI-powered changelog entries if enabled
-      let aiGeneratedEntries: Map<string, string> | undefined;
-      if (aiConfig?.generateComponentMessages) {
-        aiGeneratedEntries = await this.generateChangelogEntries(versionChanges, aiConfig);
-      }
-
-      // Update changelog
-      await changelogManager.updateChangelog(versionChanges, commitMessage, aiGeneratedEntries);
-
-      // Stage the changelog if it was created/updated
-      if (await changelogManager.exists()) {
-        await this.git.add([changelogManager.getFilePath()]);
-        console.log('📝 Staged CHANGELOG.md for next commit');
-      }
-
-    } catch (error) {
-      console.warn(`⚠️  Warning: Could not update changelog: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * Generate AI-powered changelog entries for components
-   */
-  private async generateChangelogEntries(
-    versionChanges: ComponentVersionChange[],
-    aiConfig: any
-  ): Promise<Map<string, string>> {
-    const entries = new Map<string, string>();
-    
-    try {
-      const aiManager = new AICommitManager(aiConfig);
-      
-      for (const change of versionChanges) {
-        if (change.action === 'created' || change.action === 'updated') {
-          const componentChange = {
-            name: change.name,
-            type: change.type as any,
-            path: '',
-            oldVersion: change.oldVersion,
-            newVersion: change.newVersion,
-            diff: '', // We don't have diff context here
-          };
-
-          const result = await aiManager.generateComponentMessage(componentChange);
-          if (result.success && result.message) {
-            entries.set(change.name, result.message);
-          }
-        }
-      }
-    } catch (error) {
-      console.warn('⚠️  Could not generate AI changelog entries:', error);
-    }
-    
-    return entries;
-  }
-
-  private filterGitArgs(args: string[]): string[] {
-    const edgitFlags = ['--major', '--minor', '--patch'];
-    return args.filter(arg => !edgitFlags.includes(arg));
   }
 
   /**
@@ -667,7 +171,6 @@ export class CommitCommand extends Command {
       name: string;
       path: string;
       action: 'added' | 'modified' | 'deleted';
-      componentId?: string;
     }>,
     registry: ComponentRegistry
   ): Promise<string[]> {
@@ -677,13 +180,17 @@ export class CommitCommand extends Command {
     }
 
     // Check if AI is enabled in config
-    const aiConfig = registry.metadata?.config?.ai;
-    if (!aiConfig || aiConfig.mode === 'off') {
-      return gitArgs;
+    // For new minimal registry format, AI config is not stored in registry
+    // Instead, check for .env file with OPENAI_API_KEY for AI availability
+    let aiEnabled = false;
+    try {
+      // Simple check: if OPENAI_API_KEY exists in environment, AI is available
+      aiEnabled = !!process.env.OPENAI_API_KEY;
+    } catch {
+      aiEnabled = false;
     }
 
-    // Only auto-generate if mode is 'auto' and no message provided
-    if (aiConfig.mode !== 'auto') {
+    if (!aiEnabled) {
       return gitArgs;
     }
 
@@ -696,22 +203,14 @@ export class CommitCommand extends Command {
           // Get the actual diff for this component
           const diff = await this.git.getDiff([comp.path]);
           
-          // Find existing component to get version info
-          const existingComponent = ComponentUtils.findComponentByName(registry, comp.name);
-          const oldVersion = existingComponent?.version || '0.0.0';
-          
-          // Calculate new version (simplified for now)
-          const currentVersion = new SemVer(oldVersion);
-          const newVersion = comp.action === 'added' ? '1.0.0' : currentVersion.bumpPatch().toString();
-          
           return {
             name: comp.name,
             type: comp.type,
             path: comp.path,
             action: comp.action,
             diff: diff || '',
-            oldVersion,
-            newVersion
+            oldVersion: 'n/a', // No version tracking in Git tag system
+            newVersion: 'n/a'  // Versions are created via tags
           };
         })
       );
@@ -724,7 +223,17 @@ export class CommitCommand extends Command {
       // Get overall diff for context
       const overallDiff = await this.git.getDiff();
 
-      // Generate AI commit message
+      // Generate AI commit message with simple config
+      const aiConfig = {
+        mode: 'auto' as const,
+        provider: 'openai' as const,
+        model: 'gpt-4',
+        maxDiffSize: 4000,
+        timeout: 30000,
+        generateComponentMessages: true,
+        includeVersionsInCommit: false // No version tracking in Git tag system
+      };
+      
       const aiManager = new AICommitManager(aiConfig);
       const aiResponse = await aiManager.generateRepoMessage({
         components: componentChanges,
@@ -750,17 +259,85 @@ export class CommitCommand extends Command {
     }
   }
 
+  /**
+   * Show summary of changed components (without versioning info)
+   */
+  private async showComponentsSummary(changedComponents: Array<{
+    type: ComponentType;
+    name: string;
+    path: string;
+    action: 'added' | 'modified' | 'deleted';
+  }>): Promise<void> {
+    console.log(`\n📦 Component Changes:`);
+    
+    for (const comp of changedComponents) {
+      const emoji = comp.action === 'added' ? '➕' : comp.action === 'deleted' ? '❌' : '📝';
+      console.log(`   ${emoji} ${comp.name} (${comp.type}) - ${comp.action}`);
+    }
+
+    console.log(`\n💡 Git tag-based versioning:`);
+    console.log(`   Create version tags: edgit tag <component> v1.0.0`);
+    console.log(`   Deploy to environment: edgit deploy <component> v1.0.0 --to prod`);
+    console.log(`   View component history: edgit components show <component>`);
+  }
+
+  /**
+   * Check if edgit is initialized
+   */
+  private async isEdgitInitialized(): Promise<boolean> {
+    try {
+      const repoRoot = await this.git.getRepoRoot();
+      if (!repoRoot) return false;
+
+      const edgitDir = path.join(repoRoot, CommitCommand.EDGIT_DIR);
+      const componentsFile = path.join(edgitDir, CommitCommand.COMPONENTS_FILE);
+      
+      await fs.access(componentsFile);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Load components registry
+   */
+  private async loadComponentsRegistry(): Promise<ComponentRegistry> {
+    const repoRoot = await this.git.getRepoRoot();
+    if (!repoRoot) {
+      throw new Error('Not in a git repository');
+    }
+
+    const componentsFile = path.join(repoRoot, CommitCommand.EDGIT_DIR, CommitCommand.COMPONENTS_FILE);
+    
+    try {
+      const content = await fs.readFile(componentsFile, 'utf8');
+      return JSON.parse(content) as ComponentRegistry;
+    } catch (error) {
+      if ((error as any).code === 'ENOENT') {
+        throw new Error('Edgit not initialized. Run "edgit init" first.');
+      }
+      throw new Error(`Failed to load components registry: ${error}`);
+    }
+  }
+
+  /**
+   * Get components file path
+   */
+  private async getComponentsFilePath(): Promise<string> {
+    const repoRoot = await this.git.getRepoRoot();
+    if (!repoRoot) {
+      throw new Error('Not in a git repository');
+    }
+    return path.join(repoRoot, CommitCommand.EDGIT_DIR, CommitCommand.COMPONENTS_FILE);
+  }
+
   getHelp(): string {
     return `
-edgit commit - Commit with automatic component versioning
+edgit commit - Commit with AI-powered commit messages
 
 USAGE:
   edgit commit [git-commit-options]
-
-VERSION BUMP OPTIONS:
-  --patch             Force patch version bump (default)
-  --minor             Force minor version bump  
-  --major             Force major version bump
 
 GIT OPTIONS:
   All standard git commit options are supported:
@@ -769,28 +346,34 @@ GIT OPTIONS:
   --amend             Amend previous commit
   etc.
 
-AUTOMATIC VERSION BUMPING:
-  Edgit analyzes your commit message to determine version bump:
+AI-POWERED COMMIT MESSAGES:
+  • Automatically generates descriptive commit messages when no -m flag provided
+  • Analyzes changed components and file diffs for context
+  • Follows conventional commit format (feat:, fix:, etc.)
+  • Configurable through .edgit/components.json metadata
+
+GIT TAG-BASED VERSIONING:
+  Instead of automatic version bumping, use explicit Git tags:
   
-  • MAJOR: "feat!" "breaking change" or --major flag
-  • MINOR: "feat:" "feature:" or --minor flag  
-  • PATCH: "fix:" "docs:" "style:" "refactor:" "test:" "chore:" or --patch flag
-  
-  Default: patch bump
+  edgit tag <component> v1.0.0           # Create version tag
+  edgit deploy <component> v1.0.0 --to prod # Deploy to environment
+  edgit components show <component>      # View all versions
 
 EXAMPLES:
-  edgit commit -m "fix: update extraction prompt"     # Patch bump
-  edgit commit -m "feat: add new data agent"          # Minor bump  
-  edgit commit -m "feat!: breaking API change"        # Major bump
-  edgit commit --major -m "rewrite component"         # Force major
+  edgit commit -m "fix: update extraction prompt"   # Manual message
+  edgit commit                                       # AI-generated message
+  edgit commit -a                                    # Stage all + AI message
   
 WORKFLOW:
-  1. Detects changed component files in staging area
-  2. Auto-bumps version based on commit message
-  3. Updates .edgit/components.json with new versions
-  4. Stages components.json
-  5. Proceeds with normal git commit
-  6. Shows versioning summary
+  1. Stage your changes (git add ...)
+  2. Run edgit commit (with or without -m)
+  3. AI analyzes component changes and generates message if needed
+  4. Commit proceeds normally
+  5. Create version tags separately: edgit tag <component> <version>
+
+NOTE:
+  This replaces automatic version bumping with explicit Git tag management.
+  Use edgit tag and edgit deploy for version control and deployments.
 `;
   }
 }

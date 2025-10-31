@@ -140,13 +140,10 @@ export class InitCommand extends Command {
         continue;
       }
       
-      // Create component with Cloudflare-safe naming
-      const component = await ComponentUtils.createComponentWithWorkerName(
+      // Create minimal component for registry
+      const component = ComponentUtils.createComponent(
         detected.path,
-        detected.type,
-        currentCommit,
-        'init-scan', // Simple context
-        'Initial component scan'
+        detected.type
       );
       
       components.push(component);
@@ -199,10 +196,13 @@ export class InitCommand extends Command {
           continue;
         }
         
-        // Add header
+        // Generate component name from path
+        const componentName = ComponentUtils.generateComponentName(component.path, component.type);
+        
+        // Add header with default version (actual versions managed via Git tags)
         await fileHeaderManager.writeMetadata(filePath, {
-          version: component.version,
-          component: component.name
+          version: '1.0.0', // Default version for new components
+          component: componentName
         }, {
           componentType: component.type,
           replace: false
@@ -224,43 +224,12 @@ export class InitCommand extends Command {
     
     // Add all components to registry
     for (const component of components) {
-      ComponentUtils.addComponent(registry, component);
+      const componentName = ComponentUtils.generateComponentName(component.path, component.type);
+      ComponentUtils.addComponent(registry, componentName, component);
     }
 
-    // Add metadata
-    const repoRoot = await this.git.getRepoRoot();
-    if (repoRoot) {
-      try {
-        const remoteResult = await this.git.exec(['remote', 'get-url', 'origin']);
-        const remote = remoteResult.exitCode === 0 ? remoteResult.stdout.trim() : undefined;
-        
-        const branchResult = await this.git.exec(['branch', '--show-current']);
-        const branch = branchResult.exitCode === 0 ? branchResult.stdout.trim() : undefined;
-
-        const repositoryInfo: { remote?: string; branch?: string } = {};
-        if (remote) repositoryInfo.remote = remote;
-        if (branch) repositoryInfo.branch = branch;
-
-        registry.metadata = {
-          repository: repositoryInfo,
-          config: {
-            defaultBump: 'patch',
-            useFileHeaders: options.headers || false,
-            ai: {
-              mode: 'auto',
-              provider: 'openai',
-              model: 'gpt-4-turbo-preview',
-              maxDiffSize: 10000,
-              timeout: 10000,
-              generateComponentMessages: true,
-              includeVersionsInCommit: false
-            }
-          }
-        };
-      } catch {
-        // Ignore errors getting remote/branch info
-      }
-    }
+    // Update registry timestamp
+    ComponentUtils.updateRegistry(registry);
 
     try {
       const registryJson = JSON.stringify(registry, null, 2);
@@ -324,15 +293,16 @@ export class InitCommand extends Command {
       for (const [type, comps] of Object.entries(byType)) {
         console.log(`   ${type}s (${comps.length}):`);
         for (const comp of comps) {
-          console.log(`     • ${comp.name} v${comp.version} (${comp.path})`);
+          const componentName = ComponentUtils.generateComponentName(comp.path, comp.type);
+          console.log(`     • ${componentName} (${comp.path})`);
         }
       }
     }
 
     console.log('\n🚀 Next Steps:');
-    console.log('   • Modify a component file and run "edgit commit" to auto-version it');
+    console.log('   • Run "edgit tag create <component> <version>" to version your components');
     console.log('   • Use "edgit components" to list all tracked components');
-    console.log('   • Use "edgit checkout component@version" to restore old versions');
+    console.log('   • Use "edgit components checkout <component>@<version>" to restore versions');
   }
 
   /**

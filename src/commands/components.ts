@@ -2,21 +2,21 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Command } from './base.js';
 import { GitWrapper } from '../utils/git.js';
-import { ComponentDetector } from '../utils/component-detector.js';
-import { HistoryCommand } from './history.js';
-import type { ComponentRegistry, Component, ComponentSpec, ComponentVersion } from '../models/components.js';
-import { ComponentSpecParser, SemVer } from '../models/components.js';
+import { GitTagManager, createGitTagManager } from '../utils/git-tags.js';
+import { ComponentRegistry, ComponentUtils, ComponentSpec, ComponentSpecParser } from '../models/components.js';
 
 /**
- * ComponentsCommand handles listing and managing components
+ * ComponentsCommand for Git tag-based component management
+ * Lists, shows, and manages components using Git tags for versioning
  */
 export class ComponentsCommand extends Command {
   private static readonly EDGIT_DIR = '.edgit';
   private static readonly COMPONENTS_FILE = 'components.json';
+  private tagManager: GitTagManager;
 
   constructor() {
     super();
-    this.detector = new ComponentDetector(this.git);
+    this.tagManager = createGitTagManager(this.git);
   }
 
   async execute(args: string[]): Promise<void> {
@@ -29,38 +29,34 @@ export class ComponentsCommand extends Command {
       await this.validateGitInstalled();
       await this.validateGitRepo();
 
-      const { flags, options, positional } = this.parseArgs(args);
+      const { flags, positional } = this.parseArgs(args);
       const [subcommand, ...subArgs] = positional;
 
       // Load components registry
       const registry = await this.loadComponentsRegistry();
 
       if (!subcommand || subcommand === 'list' || subcommand === 'ls') {
-        if (flags['show-worker-names']) {
-          await this.showWorkerNames(registry, flags);
-        } else {
-          await this.listComponents(registry, flags);
-        }
+        await this.listComponents(registry, flags);
       } else if (subcommand === 'show') {
+        if (!subArgs[0]) {
+          throw new Error('Component name is required for show command');
+        }
         await this.showComponent(registry, subArgs[0], flags);
       } else if (subcommand === 'checkout') {
+        if (!subArgs[0]) {
+          throw new Error('Component specification is required for checkout command');
+        }
         await this.checkoutComponent(registry, subArgs[0], flags);
-      } else if (subcommand === 'history') {
-        await this.showComponentHistory(registry, subArgs[0], flags);
-      } else if (subcommand === 'tag') {
-        await this.tagComponent(registry, subArgs[0], subArgs[1], subArgs[2], flags);
-      } else if (subcommand === 'sync') {
-        await this.syncComponents(registry, subArgs, flags);
+      } else if (subcommand === 'add') {
+        if (!subArgs[0] || !subArgs[1]) {
+          throw new Error('Component name and path are required for add command');
+        }
+        await this.addComponent(registry, subArgs[0], subArgs[1], subArgs[2], flags);
       } else if (subcommand === 'remove' || subcommand === 'rm') {
         if (!subArgs[0]) {
           throw new Error('Component name is required for remove command');
         }
         await this.removeComponent(registry, subArgs[0], flags);
-      } else if (subcommand === 'rename') {
-        if (!subArgs[0] || !subArgs[1]) {
-          throw new Error('Both old and new component names are required for rename command');
-        }
-        await this.renameComponent(registry, subArgs[0], subArgs[1], flags);
       } else {
         // Treat as component name for show
         await this.showComponent(registry, subcommand, flags);
@@ -69,13 +65,335 @@ export class ComponentsCommand extends Command {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.showError(`Component operation failed: ${message}`, [
-        'Ensure edgit is initialized with "edgit setup"',
+        'Ensure edgit is initialized with "edgit init"',
         'Check that the component name is correct',
         'Use "edgit components" to list all components'
       ]);
       throw error;
     }
   }
+
+  /**
+   * List all components with Git tag information
+   */
+  private async listComponents(registry: ComponentRegistry, flags: Record<string, boolean>): Promise<void> {
+    const componentEntries = ComponentUtils.getAllComponents(registry);
+    
+    if (componentEntries.length === 0) {
+      this.showInfo('No components found. Add components with "edgit components add <name> <path> <type>".');
+      return;
+    }
+
+    console.log(`\n🧩 Components (${componentEntries.length} total):\n`);
+
+    if (flags.verbose || flags.v) {
+      // Verbose listing with Git tag details
+      for (const { name, component } of componentEntries) {
+        await this.showComponentSummary(name, component, true);
+        console.log('');
+      }
+    } else {
+      // Compact listing grouped by type
+      const byType = componentEntries.reduce((acc, { name, component }) => {
+        if (!acc[component.type]) acc[component.type] = [];
+        acc[component.type]!.push({ name, component });
+        return acc;
+      }, {} as Record<string, Array<{ name: string; component: any }>>);
+
+      for (const [type, components] of Object.entries(byType)) {
+        console.log(`📁 ${type}:`);
+        for (const { name, component } of components) {
+          await this.showComponentSummary(name, component, false);
+        }
+        console.log('');
+      }
+    }
+  }
+
+  /**
+   * Show detailed information about a specific component
+   */
+  private async showComponent(registry: ComponentRegistry, componentName: string, flags: Record<string, boolean>): Promise<void> {
+    const component = ComponentUtils.findComponentByName(registry, componentName);
+    
+    if (!component) {
+      throw new Error(`Component '${componentName}' not found`);
+    }
+
+    console.log(`\n📦 ${componentName}\n`);
+    console.log(`Path: ${component.path}`);
+    console.log(`Type: ${component.type}`);
+
+    try {
+      // Get all tags for this component
+      const allTags = await this.tagManager.listComponentTags(componentName);
+      const versionTags = await this.tagManager.getVersionTags(componentName);
+      const deploymentTags = await this.tagManager.getDeploymentTags(componentName);
+      
+      // Show version tags
+      if (versionTags.length > 0) {
+        console.log(`\n🏷️  Version Tags:`);
+        for (const version of versionTags) {
+          try {
+            const tagInfo = await this.tagManager.getTagInfo(componentName, version);
+            console.log(`   ${version} - ${tagInfo.sha.substring(0, 8)} - ${tagInfo.date} - ${tagInfo.message}`);
+          } catch {
+            console.log(`   ${version} - (error getting info)`);
+          }
+        }
+      }
+
+      // Show deployment tags
+      if (deploymentTags.length > 0) {
+        console.log(`\n🚀 Deployment Tags:`);
+        for (const env of deploymentTags) {
+          try {
+            const tagInfo = await this.tagManager.getTagInfo(componentName, env);
+            
+            // Find which version this points to
+            let pointsToVersion = 'custom';
+            for (const version of versionTags) {
+              try {
+                const versionSHA = await this.tagManager.getTagSHA(componentName, version);
+                if (versionSHA === tagInfo.sha) {
+                  pointsToVersion = version;
+                  break;
+                }
+              } catch {
+                // Continue searching
+              }
+            }
+            
+            console.log(`   ${env} → ${pointsToVersion} (${tagInfo.sha.substring(0, 8)}) - ${tagInfo.date}`);
+          } catch {
+            console.log(`   ${env} - (error getting info)`);
+          }
+        }
+      }
+
+      // Show custom tags
+      const customTags = allTags.filter(tag => 
+        !versionTags.includes(tag) && !deploymentTags.includes(tag)
+      );
+      
+      if (customTags.length > 0) {
+        console.log(`\n🏷️  Custom Tags:`);
+        for (const tag of customTags) {
+          try {
+            const tagInfo = await this.tagManager.getTagInfo(componentName, tag);
+            console.log(`   ${tag} - ${tagInfo.sha.substring(0, 8)} - ${tagInfo.date} - ${tagInfo.message}`);
+          } catch {
+            console.log(`   ${tag} - (error getting info)`);
+          }
+        }
+      }
+
+      if (allTags.length === 0) {
+        console.log(`\n⚠️  No tags found for this component`);
+        console.log(`   Create tags with: edgit tag ${componentName} <tagname>`);
+      }
+
+      // Show file content if requested
+      if (flags.content || flags.c) {
+        console.log(`\n📄 Current Content:`);
+        try {
+          const repoRoot = await this.git.getRepoRoot();
+          if (repoRoot) {
+            const filePath = path.join(repoRoot, component.path);
+            const content = await fs.readFile(filePath, 'utf-8');
+            console.log(content);
+          }
+        } catch (error) {
+          console.log(`   Error reading file: ${error instanceof Error ? error.message : error}`);
+        }
+      }
+
+    } catch (error) {
+      console.log(`\n⚠️  Error getting Git tag information: ${error instanceof Error ? error.message : error}`);
+    }
+
+    console.log(`\n💡 Commands:`);
+    console.log(`   edgit tag ${componentName} v1.0.0          # Create version tag`);
+    console.log(`   edgit tag ${componentName} prod            # Create deployment tag`);
+    console.log(`   edgit checkout ${componentName}@v1.0.0     # Checkout specific version`);
+    console.log(`   edgit deploy ${componentName} v1.0.0 --to prod # Deploy version`);
+  }
+
+  /**
+   * Checkout a component at a specific version/tag/SHA
+   */
+  private async checkoutComponent(registry: ComponentRegistry, componentSpec: string, flags: Record<string, boolean>): Promise<void> {
+    const spec = ComponentSpecParser.parse(componentSpec);
+    const component = ComponentUtils.findComponentByName(registry, spec.name);
+    
+    if (!component) {
+      throw new Error(`Component '${spec.name}' not found`);
+    }
+
+    try {
+      let content: string;
+      
+      if (spec.ref) {
+        // Checkout specific version/tag/SHA
+        content = await this.tagManager.getFileAtTag(spec.name, spec.ref, component.path);
+        console.log(`📦 ${spec.name}@${spec.ref}:`);
+      } else {
+        // Checkout current version (HEAD)
+        const repoRoot = await this.git.getRepoRoot();
+        if (!repoRoot) {
+          throw new Error('Not in a git repository');
+        }
+        const filePath = path.join(repoRoot, component.path);
+        content = await fs.readFile(filePath, 'utf-8');
+        console.log(`📦 ${spec.name} (current):`);
+      }
+
+      console.log('');
+      console.log(content);
+
+    } catch (error) {
+      throw new Error(`Failed to checkout ${componentSpec}: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+
+  /**
+   * Add a new component to the registry
+   */
+  private async addComponent(
+    registry: ComponentRegistry, 
+    name: string, 
+    filePath: string, 
+    type?: string, 
+    flags?: Record<string, boolean>
+  ): Promise<void> {
+    // Validate component doesn't already exist
+    if (ComponentUtils.componentExists(registry, name)) {
+      throw new Error(`Component '${name}' already exists`);
+    }
+
+    // Validate file exists
+    const repoRoot = await this.git.getRepoRoot();
+    if (!repoRoot) {
+      throw new Error('Not in a git repository');
+    }
+
+    const fullPath = path.resolve(repoRoot, filePath);
+    try {
+      await fs.access(fullPath);
+    } catch {
+      throw new Error(`File not found: ${filePath}`);
+    }
+
+    // Determine type if not provided
+    let componentType = type;
+    if (!componentType) {
+      // Simple type detection based on file extension
+      const ext = path.extname(filePath).toLowerCase();
+      if (ext === '.md' || ext === '.txt') {
+        componentType = 'prompt';
+      } else if (ext === '.js' || ext === '.ts') {
+        componentType = 'agent';
+      } else if (ext === '.sql') {
+        componentType = 'sql';
+      } else if (ext === '.json' || ext === '.yaml' || ext === '.yml') {
+        componentType = 'config';
+      } else {
+        throw new Error('Could not determine component type. Please specify: prompt, agent, sql, or config');
+      }
+    }
+
+    // Validate type
+    const validTypes = ['prompt', 'agent', 'sql', 'config'];
+    if (!validTypes.includes(componentType)) {
+      throw new Error(`Invalid component type. Must be one of: ${validTypes.join(', ')}`);
+    }
+
+    // Create component
+    const component = ComponentUtils.createComponent(filePath, componentType as any);
+    
+    // Add to registry
+    ComponentUtils.addComponent(registry, name, component);
+    await this.saveComponentsRegistry(registry);
+
+    console.log(`✅ Added component '${name}'`);
+    console.log(`   Path: ${filePath}`);
+    console.log(`   Type: ${componentType}`);
+    console.log(`\n💡 Next steps:`);
+    console.log(`   edgit tag ${name} v1.0.0     # Create first version tag`);
+    console.log(`   edgit tag ${name} prod       # Create deployment tag`);
+  }
+
+  /**
+   * Remove a component from the registry
+   */
+  private async removeComponent(registry: ComponentRegistry, componentName: string, flags: Record<string, boolean>): Promise<void> {
+    if (!ComponentUtils.componentExists(registry, componentName)) {
+      throw new Error(`Component '${componentName}' not found`);
+    }
+
+    // Warn about Git tags
+    try {
+      const tags = await this.tagManager.listComponentTags(componentName);
+      if (tags.length > 0 && !flags.force) {
+        console.log(`⚠️  Component '${componentName}' has ${tags.length} Git tags:`);
+        console.log(`   ${tags.join(', ')}`);
+        console.log(`\n   Use --force to remove anyway (Git tags will remain)`);
+        console.log(`   Or manually delete tags first with: edgit tag delete <component>@<tag>`);
+        return;
+      }
+    } catch {
+      // Continue if we can't get tag info
+    }
+
+    ComponentUtils.removeComponent(registry, componentName);
+    await this.saveComponentsRegistry(registry);
+
+    console.log(`✅ Removed component '${componentName}' from registry`);
+    console.log(`   Note: Git tags for this component still exist`);
+    console.log(`   Use: edgit tag list ${componentName} to see them`);
+  }
+
+  /**
+   * Show a summary of a component (used in listings)
+   */
+  private async showComponentSummary(name: string, component: any, verbose: boolean): Promise<void> {
+    try {
+      const versionTags = await this.tagManager.getVersionTags(name);
+      const deploymentTags = await this.tagManager.getDeploymentTags(name);
+      
+      let latestVersion = 'none';
+      if (versionTags.length > 0) {
+        latestVersion = versionTags[versionTags.length - 1] || 'none';
+      }
+
+      if (verbose) {
+        console.log(`📦 ${name}`);
+        console.log(`   Type: ${component.type}`);
+        console.log(`   Path: ${component.path}`);
+        console.log(`   Latest: ${latestVersion}`);
+        console.log(`   Versions: ${versionTags.length}`);
+        
+        if (deploymentTags.length > 0) {
+          console.log(`   Deployments: ${deploymentTags.join(', ')}`);
+        }
+      } else {
+        const deployInfo = deploymentTags.length > 0 ? ` [${deploymentTags.join(',')}]` : '';
+        console.log(`   📦 ${name}: ${latestVersion} (${versionTags.length} versions)${deployInfo}`);
+      }
+    } catch (error) {
+      // Fallback if Git tag operations fail
+      if (verbose) {
+        console.log(`📦 ${name}`);
+        console.log(`   Type: ${component.type}`);
+        console.log(`   Path: ${component.path}`);
+        console.log(`   Tags: error getting info`);
+      } else {
+        console.log(`   📦 ${name}: (error getting tag info)`);
+      }
+    }
+  }
+
+  // Utility methods
 
   private async loadComponentsRegistry(): Promise<ComponentRegistry> {
     const repoRoot = await this.git.getRepoRoot();
@@ -90,7 +408,7 @@ export class ComponentsCommand extends Command {
       return JSON.parse(content) as ComponentRegistry;
     } catch (error) {
       if ((error as any).code === 'ENOENT') {
-        throw new Error('Edgit not initialized. Run "edgit setup" first.');
+        throw new Error('Edgit not initialized. Run "edgit init" first.');
       }
       throw new Error(`Failed to load components registry: ${error}`);
     }
@@ -105,577 +423,65 @@ export class ComponentsCommand extends Command {
     const componentsFile = path.join(repoRoot, ComponentsCommand.EDGIT_DIR, ComponentsCommand.COMPONENTS_FILE);
     
     try {
-      registry.updated = new Date().toISOString();
-      const content = JSON.stringify(registry, null, 2);
+      const updatedRegistry = ComponentUtils.updateRegistry(registry);
+      const content = JSON.stringify(updatedRegistry, null, 2);
       await fs.writeFile(componentsFile, content, 'utf8');
     } catch (error) {
       throw new Error(`Failed to save components registry: ${error}`);
     }
   }
 
-  private async listComponents(registry: ComponentRegistry, flags: Record<string, boolean>): Promise<void> {
-    const components = Object.values(registry.components);
-    
-    if (components.length === 0) {
-      this.showInfo('No components found. Add some component files and run "edgit setup".');
-      return;
-    }
-
-    console.log(`\n🧩 Components (${components.length} total):\n`);
-
-    if (flags.verbose || flags.v) {
-      // Verbose listing with details
-      for (const component of components) {
-        console.log(`📦 ${component.name}`);
-        console.log(`   Type: ${component.type}`);
-        console.log(`   Path: ${component.path}`);
-        console.log(`   Version: v${component.version}`);
-        console.log(`   Versions: ${component.versionHistory.length}`);
-        
-        if (component.tags && Object.keys(component.tags).length > 0) {
-          const tags = Object.entries(component.tags)
-            .map(([tag, version]) => `${tag}:v${version}`)
-            .join(', ');
-          console.log(`   Tags: ${tags}`);
-        }
-        console.log('');
-      }
-    } else {
-      // Compact listing
-      const byType = components.reduce((acc, comp) => {
-        if (!acc[comp.type]) acc[comp.type] = [];
-        acc[comp.type]!.push(comp);
-        return acc;
-      }, {} as Record<string, Component[]>);
-
-      for (const [type, comps] of Object.entries(byType)) {
-        console.log(`${this.getTypeIcon(type)} ${type}s (${comps.length}):`);
-        for (const comp of comps) {
-          const tags = comp.tags && Object.keys(comp.tags).length > 0 
-            ? ` [${Object.keys(comp.tags).join(', ')}]` 
-            : '';
-          console.log(`   • ${comp.name} v${comp.version}${tags}`);
-        }
-        console.log('');
-      }
-    }
-
-    console.log('💡 Use "edgit components show <name>" for detailed component info');
-    console.log('💡 Use "edgit components --verbose" for expanded listing');
-  }
-
-  private async showComponent(
-    registry: ComponentRegistry, 
-    componentName: string | undefined, 
-    flags: Record<string, boolean>
-  ): Promise<void> {
-    if (!componentName) {
-      throw new Error('Component name is required');
-    }
-
-    const component = this.findComponent(registry, componentName);
-    if (!component) {
-      this.showError(`Component "${componentName}" not found`, [
-        'Use "edgit components" to list available components',
-        'Check component name spelling'
-      ]);
-      return;
-    }
-
-    console.log(`\n📦 ${component.name}\n`);
-    console.log(`Type:        ${component.type}`);
-    console.log(`Path:        ${component.path}`);
-    console.log(`Version:     v${component.version}`);
-    console.log(`Versions:    ${component.versionHistory.length} total`);
-    
-    if (component.tags && Object.keys(component.tags).length > 0) {
-      console.log('Tags:');
-      for (const [tag, version] of Object.entries(component.tags)) {
-        console.log(`             ${tag} → v${version}`);
-      }
-    }
-
-    console.log('\n📚 Version History:');
-    const sortedVersions = component.versionHistory
-      .slice()
-      .sort((a, b) => {
-        try {
-          const versionA = new SemVer(a.version);
-          const versionB = new SemVer(b.version);
-          return versionB.compare(versionA); // Newest first
-        } catch {
-          return b.timestamp.localeCompare(a.timestamp);
-        }
-      });
-
-    for (const version of sortedVersions) {
-      const date = new Date(version.timestamp).toLocaleDateString();
-      const commitShort = version.commit.substring(0, 8);
-      const current = version.version === component.version ? ' (current)' : '';
-      
-      console.log(`   v${version.version}${current}`);
-      console.log(`     ${date} • ${commitShort} • ${version.message || 'No message'}`);
-    }
-
-    console.log(`\n💡 Use "edgit checkout ${componentName}@<version>" to restore a specific version`);
-    console.log(`💡 Use "edgit components tag ${componentName} <tag> [version]" to tag a version`);
-  }
-
-  private async checkoutComponent(
-    registry: ComponentRegistry,
-    componentSpec: string | undefined,
-    flags: Record<string, boolean>
-  ): Promise<void> {
-    if (!componentSpec) {
-      throw new Error('Component specification is required (component@version or component@tag)');
-    }
-
-    const spec = ComponentSpecParser.parse(componentSpec);
-    if (!spec.version) {
-      throw new Error('Version or tag is required for checkout');
-    }
-
-    const component = this.findComponent(registry, spec.name);
-    if (!component) {
-      throw new Error(`Component "${spec.name}" not found`);
-    }
-
-    let targetCommit: string | undefined;
-    let targetVersion: string;
-    let versionEntry: ComponentVersion;
-
-    if (spec.isTag) {
-      if (spec.version === 'latest') {
-        // Special "latest" tag - always points to current version
-        targetVersion = component.version;
-        const entry = component.versionHistory.find(v => v.version === targetVersion);
-        if (!entry) {
-          throw new Error(`Current version "${targetVersion}" not found in history`);
-        }
-        versionEntry = entry;
-        targetCommit = versionEntry.commit;
-        this.showInfo(`Checking out latest version (v${targetVersion})`);
-      } else if (component.tags?.[spec.version]) {
-        // Regular tag reference
-        const taggedVersion = component.tags[spec.version];
-        if (!taggedVersion) {
-          throw new Error(`Tag "${spec.version}" not found for component "${spec.name}"`);
-        }
-        targetVersion = taggedVersion;
-        const entry = component.versionHistory.find(v => v.version === targetVersion);
-        if (!entry) {
-          throw new Error(`Tagged version "${targetVersion}" not found in history`);
-        }
-        versionEntry = entry;
-        targetCommit = versionEntry.commit;
-        this.showInfo(`Checking out tag "${spec.version}" (v${targetVersion})`);
-      } else {
-        throw new Error(`Tag "${spec.version}" not found for component "${spec.name}"`);
-      }
-    } else {
-      // Direct version reference
-      targetVersion = spec.version;
-      const entry = component.versionHistory.find(v => v.version === targetVersion);
-      if (!entry) {
-        throw new Error(`Version "${targetVersion}" not found for component "${spec.name}"`);
-      }
-      versionEntry = entry;
-      targetCommit = versionEntry.commit;
-      this.showInfo(`Checking out v${targetVersion}`);
-    }
-
-    // Check if file exists at the target commit before attempting checkout
-    // Use the path from the version history since file may have been renamed
-    const targetPath = versionEntry.path || component.path; // fallback to current path for old version histories
-    const fileExists = await this.git.fileExistsAtCommit(targetPath, targetCommit!);
-    if (!fileExists) {
-      throw new Error(
-        `File "${targetPath}" does not exist at commit ${targetCommit} (version ${targetVersion}).\n` +
-        `This might indicate an incorrect version history. Try:\n` +
-        `  • edgit resync "${spec.name}" to rebuild the component history\n` +
-        `  • edgit components show "${spec.name}" to view available versions\n` +
-        `  • Check that the component was properly registered`
-      );
-    }
-
-    // Check out the file from the specific commit
-    // If the file was renamed, checkout to a temp location then move to current location
-    if (targetPath !== component.path) {
-      // File was renamed - checkout to temp location then move
-      const success = await this.git.checkoutFile(targetPath, targetCommit!);
-      if (!success) {
-        throw new Error(`Failed to checkout ${targetPath} from commit ${targetCommit}`);
-      }
-      
-      // Move the file to current location
-      try {
-        await fs.rename(targetPath, component.path);
-      } catch (error) {
-        throw new Error(`Failed to move restored file from ${targetPath} to ${component.path}: ${error}`);
-      }
-    } else {
-      // Same path - direct checkout
-      const success = await this.git.checkoutFile(component.path, targetCommit!);
-      if (!success) {
-        throw new Error(`Failed to checkout ${component.path} from commit ${targetCommit}`);
-      }
-    }
-
-    this.showSuccess(`✅ Restored ${component.path} to v${targetVersion}`);
-    this.showWarning('⚠️  File has been modified in working directory. Commit or stash changes if needed.');
-  }
-
-  private async tagComponent(
-    registry: ComponentRegistry,
-    componentName: string | undefined,
-    tagName: string | undefined,
-    version: string | undefined,
-    flags: Record<string, boolean>
-  ): Promise<void> {
-    if (!componentName || !tagName) {
-      throw new Error('Component name and tag name are required');
-    }
-
-    const component = this.findComponent(registry, componentName);
-    if (!component) {
-      throw new Error(`Component "${componentName}" not found`);
-    }
-
-    const targetVersion = version || component.version;
-    
-    // Validate version exists
-    const versionExists = component.versionHistory.some(v => v.version === targetVersion);
-    if (!versionExists) {
-      throw new Error(`Version "${targetVersion}" not found for component "${componentName}"`);
-    }
-
-    // Add tag
-    if (!component.tags) {
-      component.tags = {};
-    }
-    component.tags[tagName] = targetVersion;
-
-    // Save registry
-    await this.saveComponentsRegistry(registry);
-
-    this.showSuccess(`Tagged ${componentName} v${targetVersion} as "${tagName}"`);
-  }
-
-  private async showComponentHistory(
-    registry: ComponentRegistry,
-    componentName: string | undefined,
-    flags: Record<string, boolean>
-  ): Promise<void> {
-    if (!componentName) {
-      throw new Error('Component name is required for history');
-    }
-
-    // Delegate to HistoryCommand
-    const historyCommand = new HistoryCommand();
-    await historyCommand.execute([componentName]);
-  }
-
-  private getTypeIcon(type: string): string {
-    switch (type) {
-      case 'prompt': return '💬';
-      case 'agent': return '🤖';
-      case 'sql': return '🗃️';
-      case 'config': return '⚙️';
-      default: return '📄';
-    }
-  }
-
   getHelp(): string {
     return `
-edgit components - Manage component versions
+edgit components - Manage components using Git tags
 
 USAGE:
   edgit components [subcommand] [options]
-  edgit component [subcommand] [options]
+  edgit components list [--verbose]         List all components
+  edgit components show <component> [--content] Show component details
+  edgit components checkout <component>[@ref] Checkout component content
+  edgit components add <name> <path> [type] Add new component
+  edgit components remove <name> [--force]  Remove component
 
 SUBCOMMANDS:
-  list, ls             List all components (default)
-  show <name>          Show detailed component information
-  history <name>       Show version history for component
-  checkout <comp@ver>  Restore component to specific version
-  tag <name> <tag>     Tag a component version
-  sync [names...]      Sync file headers with registry versions
-  remove <name>        Remove component from registry (--force required)
-  rename <old> <new>   Rename component in registry and update headers
-  
+  list, ls          List all components with Git tag information
+  show <component>  Show detailed component information with all tags
+  checkout <spec>   Show content of component at specific version/tag
+  add <name> <path> [type] Add a new component to the registry
+  remove <name>     Remove component from registry (Git tags remain)
+
+COMPONENT SPECIFICATIONS:
+  component-name                    Show current version
+  component-name@v1.0.0            Show specific version tag
+  component-name@prod               Show deployment tag
+  component-name@abc123             Show specific SHA
+
+COMPONENT TYPES:
+  prompt            Prompt templates (.md, .txt)
+  agent             Code/scripts (.js, .ts)
+  sql               SQL queries (.sql)
+  config            Configuration (.json, .yaml, .yml)
+
 OPTIONS:
-  --verbose, -v        Show detailed information
-  --force, -f          Skip confirmations (for remove command)
-  --show-worker-names  Show Cloudflare worker names for deployment
-  --help, -h           Show this help message
+  --verbose, -v     Show detailed information
+  --content, -c     Show file content (with show command)
+  --force           Force operation (bypass warnings)
 
 EXAMPLES:
-  edgit components                    # List all components
-  edgit components --verbose          # List with detailed info
-  edgit components --show-worker-names # Show Cloudflare worker names
-  edgit components show extraction    # Show extraction component details
-  edgit components history extraction # Show version history
-  edgit components checkout prompt@1.0.0  # Restore prompt to v1.0.0
-  edgit components tag prompt prod 1.2.0   # Tag v1.2.0 as "prod"
-  edgit components sync               # Sync all headers with registry
-  edgit components sync extractor     # Sync specific component header
-  edgit components remove old-component --force  # Remove component
-  edgit components rename old new     # Rename component
+  edgit components                          # List all components
+  edgit components show extraction-prompt   # Show component details
+  edgit components checkout extraction-prompt@v1.0.0 # Show specific version
+  edgit components add my-prompt prompts/test.md prompt # Add new component
+  edgit components remove old-component     # Remove component
 
-COMPONENT SPECIFICATION:
-  component@version    # Specific version (e.g., extraction@1.0.0)
-  component@tag        # Tagged version (e.g., extraction@prod)
+INTEGRATION:
+  This command works with Git tags created by:
+  - edgit tag <component> <version>         # Create version tags
+  - edgit deploy <component> <version> --to <env> # Create deployment tags
+
+NOTE:
+  Components are stored in .edgit/components.json as a minimal manifest.
+  All versioning information comes from Git tags, not the registry file.
 `;
   }
-
-  /**
-   * Sync components - Update file headers to match registry versions
-   */
-  private async syncComponents(
-    registry: ComponentRegistry, 
-    componentNames: string[], 
-    flags: Record<string, boolean>
-  ): Promise<void> {
-    const { fileHeaderManager } = await import('../utils/file-headers.js');
-    
-    let componentsToSync: Component[];
-    
-    if (componentNames.length === 0) {
-      // Sync all components
-      componentsToSync = Object.values(registry.components);
-      console.log('🔄 Syncing all component headers...');
-    } else {
-      // Sync specific components
-      componentsToSync = [];
-      for (const name of componentNames) {
-        const component = registry.components[name];
-        if (!component) {
-          console.warn(`⚠️  Component '${name}' not found in registry`);
-          continue;
-        }
-        componentsToSync.push(component);
-      }
-      console.log(`🔄 Syncing ${componentsToSync.length} component headers...`);
-    }
-
-    let synced = 0;
-    let skipped = 0;
-    
-    for (const component of componentsToSync) {
-      try {
-        const filePath = this.resolveWorkspacePath(component.path);
-        
-        // Check if file exists
-        try {
-          await fs.access(filePath);
-        } catch {
-          console.warn(`⚠️  File not found: ${component.path}`);
-          skipped++;
-          continue;
-        }
-        
-        // Check if header exists
-        const existingHeader = await fileHeaderManager.readMetadata(filePath);
-        
-        if (existingHeader) {
-          // Update header to match registry version
-          await fileHeaderManager.writeMetadata(filePath, {
-            version: component.version,
-            component: component.name
-          }, { 
-            replace: true,
-            componentType: component.type
-          });
-          
-          console.log(`  ✅ ${component.name}: ${existingHeader.version} → ${component.version}`);
-          synced++;
-        } else {
-          if (flags.verbose) {
-            console.log(`  ⏭️  ${component.name}: No header found (skipping)`);
-          }
-          skipped++;
-        }
-      } catch (error) {
-        console.warn(`  ❌ ${component.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        skipped++;
-      }
-    }
-    
-    console.log(`\n📊 Sync Summary: ${synced} updated, ${skipped} skipped`);
-    
-    if (synced > 0) {
-      console.log('💡 Run "git add ." to stage header changes');
-    }
-  }
-
-  /**
-   * Remove component from registry
-   */
-  private async removeComponent(
-    registry: ComponentRegistry, 
-    componentName: string, 
-    flags: Record<string, boolean>
-  ): Promise<void> {
-    if (!componentName) {
-      throw new Error('Component name is required for remove command');
-    }
-    
-    const component = this.findComponent(registry, componentName);
-    if (!component) {
-      throw new Error(`Component '${componentName}' not found in registry`);
-    }
-    
-    // Confirm deletion unless --force flag is used
-    if (!flags.force) {
-      console.log(`\n🗑️  About to remove component: ${componentName}`);
-      console.log(`   ID: ${component.id}`);
-      console.log(`   Path: ${component.path}`);
-      console.log(`   Version: ${component.version}`);
-      console.log(`   History: ${component.versionHistory.length} versions`);
-      console.log('\n⚠️  This will remove the component from the registry but NOT delete the file.');
-      console.log('   The file header will be marked as deregistered.');
-      console.log('   Use --force to skip this confirmation.');
-      
-      // In a real implementation, you'd use readline for user input
-      // For now, require --force flag
-      throw new Error('Add --force flag to confirm component removal');
-    }
-    
-    // Remove from registry
-    delete registry.components[component.id];
-    registry.updated = new Date().toISOString();
-    
-    // Mark file header as deregistered (if header exists)
-    try {
-      const { fileHeaderManager } = await import('../utils/file-headers.js');
-      const existingHeader = await fileHeaderManager.readMetadata(component.path);
-      
-      if (existingHeader) {
-        // Update header to mark as deregistered
-        await fileHeaderManager.writeMetadata(component.path, {
-          version: component.version,
-          component: `${component.name} [DEREGISTERED]`,
-          componentId: component.id
-        }, { 
-          replace: true,
-          componentType: component.type
-        });
-        
-        console.log(`📝 Marked file header as deregistered: ${component.path}`);
-      }
-    } catch (error) {
-      console.warn(`⚠️  Could not update file header: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-
-    // Save updated registry
-    await this.saveComponentsRegistry(registry);
-    
-    console.log(`✅ Removed component '${componentName}' from registry`);
-    console.log('💡 The file still exists and can be re-registered if needed');
-    console.log('💡 File header has been marked as [DEREGISTERED] for tracking');
-  }
-
-  /**
-   * Rename component in registry
-   */
-  private async renameComponent(
-    registry: ComponentRegistry, 
-    oldName: string, 
-    newName: string, 
-    flags: Record<string, boolean>
-  ): Promise<void> {
-    if (!oldName || !newName) {
-      throw new Error('Both old and new component names are required');
-    }
-    
-    if (oldName === newName) {
-      throw new Error('Old and new names cannot be the same');
-    }
-    
-    // Find component by name (not by registry key)
-    const component = this.findComponent(registry, oldName);
-    if (!component) {
-      throw new Error(`Component '${oldName}' not found in registry`);
-    }
-    
-    // Check if new name already exists
-    const existingComponent = this.findComponent(registry, newName);
-    if (existingComponent) {
-      throw new Error(`Component '${newName}' already exists in registry`);
-    }
-    
-    // Update component name (component stays under same ID key)
-    component.name = newName;
-    registry.updated = new Date().toISOString();
-    
-    // Update file header if it exists
-    try {
-      const { fileHeaderManager } = await import('../utils/file-headers.js');
-      const filePath = this.resolveWorkspacePath(component.path);
-      
-      const existingHeader = await fileHeaderManager.readMetadata(filePath);
-      if (existingHeader) {
-        await fileHeaderManager.writeMetadata(filePath, {
-          version: component.version,
-          component: newName
-        }, { 
-          replace: true,
-          componentType: component.type
-        });
-        
-        console.log(`🔄 Updated file header: ${oldName} → ${newName}`);
-      }
-    } catch (error) {
-      console.warn(`⚠️  Could not update file header: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-    
-    // Save updated registry
-    await this.saveComponentsRegistry(registry);
-    
-    console.log(`✅ Renamed component: ${oldName} → ${newName}`);
-    console.log('💡 File header and registry have been updated');
-  }
-
-  /**
-   * Find component by name or display name
-   */
-  private findComponent(registry: ComponentRegistry, nameOrDisplayName: string): Component | undefined {
-    // Search through all components to find by name
-    const components = Object.values(registry.components);
-    return components.find(comp => comp.name === nameOrDisplayName);
-  }
-
-  /**
-   * Show worker names for Cloudflare deployment
-   */
-  private async showWorkerNames(registry: ComponentRegistry, flags: Record<string, boolean>): Promise<void> {
-    const components = Object.values(registry.components);
-    
-    if (components.length === 0) {
-      console.log('\n⚡ No components found for worker deployment');
-      return;
-    }
-
-    console.log(`\n⚡ Cloudflare Worker Names (${components.length} total):\n`);
-    
-    for (const component of components) {
-      console.log(`📦 ${component.name}`);
-      console.log(`   Type: ${component.type}`);
-      console.log(`   Version: v${component.version}`);
-      console.log('');
-    }
-
-    console.log('💡 Use these exact worker names when deploying to Cloudflare');
-    if (flags.verbose || flags.v) {
-      console.log('💡 Worker names are Cloudflare Edge Worker safe');
-    }
-  }
-}
-
-/**
- * Convenience function to create and execute ComponentsCommand
- */
-export async function manageComponents(args: string[] = []): Promise<void> {
-  const command = new ComponentsCommand();
-  await command.execute(args);
 }

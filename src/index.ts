@@ -6,7 +6,9 @@ dotenv.config();
 
 import { GitWrapper } from './utils/git.js';
 import { setupEdgit } from './commands/init.js';
-import { manageComponents } from './commands/components.js';
+import { ComponentsCommand } from './commands/components.js';
+import { TagCommand } from './commands/tag.js';
+import { DeployCommand } from './commands/deploy.js';
 import { commitWithVersioning } from './commands/commit.js';
 import { DiscoverCommand } from './commands/discover.js';
 import { DetectCommand } from './commands/detect.js';
@@ -81,7 +83,9 @@ function parseArgs(argv: string[]): ParsedArgs {
  */
 function isSubcommand(command: string, arg: string): boolean {
   const subcommands: Record<string, string[]> = {
-    components: ['list', 'ls', 'show', 'history', 'checkout', 'tag', 'sync', 'remove', 'rename'],
+    components: ['list', 'ls', 'show', 'checkout', 'add', 'remove', 'rm'],
+    tag: ['create', 'list', 'show', 'delete', 'push'],
+    deploy: ['set', 'promote', 'status', 'list', 'rollback'],
     discover: ['scan', 'detect', 'patterns'],
     patterns: ['list', 'add', 'remove', 'show']
   };
@@ -122,7 +126,7 @@ async function validateWorkspace(workspaceDir: string): Promise<string> {
  */
 function showHelp(): void {
   console.log(`
-🧩 Edgit - Component-aware Git for AI Orchestration
+🧩 Edgit - Git Tag-Based Component Versioning for AI Orchestration
 
 USAGE:
   edgit <command> [args...] [workspace-dir]
@@ -135,18 +139,30 @@ GLOBAL OPTIONS:
 
 CORE COMMANDS:
   init                 Initialize edgit in current git repository
-  commit [args...]     Commit with automatic component versioning
+  commit [args...]     Commit with AI-powered commit messages
   status [args...]     Show git status with component information
-  resync [options]     Recover from corrupted state, rebuild from Git
 
 COMPONENT MANAGEMENT:
-  components list      List all tracked components
-  components show <name>       Show component details  
-  components history <name>    Show version history
-  components checkout <comp@ver>   Restore component version
-  components tag <name> <tag>      Tag component versions
+  components list      List all tracked components with Git tag info
+  components show <name>       Show component details and version tags
+  components checkout <comp@ref> Show component content at version/tag/SHA
+  components add <name> <path> <type> Add new component to registry
   components remove <name>     Remove component from registry
-  register <file>      Manually register file as component
+
+GIT TAG-BASED VERSIONING:
+  tag create <comp> <version>  Create immutable version tag (v1.0.0)
+  tag create <comp> <env>      Create/move deployment tag (prod, staging)
+  tag list [component]         List tags for component(s)
+  tag show <comp>@<tag>        Show detailed tag information
+  tag delete <comp>@<tag>      Delete a tag
+  tag push [component]         Push tags to remote
+
+DEPLOYMENT MANAGEMENT:
+  deploy set <comp> <ver> --to <env>     Deploy version to environment
+  deploy promote <comp> --from <src> --to <dst> Promote between environments
+  deploy status [component]              Show deployment status
+  deploy list [environment]              List deployments
+  deploy rollback <comp> --env <env>     Rollback deployment
 
 DISCOVERY & ANALYSIS:
   discover scan [options]      Find potential components
@@ -154,42 +170,39 @@ DISCOVERY & ANALYSIS:
   discover patterns [options]  Manage detection patterns
 
 SHORTCUTS:
-  checkout <comp@ver>  Shortcut to components checkout
+  checkout <comp@ref>  Shortcut to components checkout
   
-  --version, -v        Show version information
-  --help, -h           Show this help message
-
 EXAMPLES:
-  edgit discover scan --type prompt           # Find potential prompt components
-  edgit discover detect prompts/system.md    # Analyze specific file
-  edgit components history extraction-prompt # Show version history
-  edgit components tag prompt prod           # Tag version for deployment
-  edgit resync --rebuild-history             # Recover from corruption
+  # Component management
+  edgit components add my-prompt prompts/test.md prompt
+  edgit components show extraction-prompt
+  edgit checkout extraction-prompt@v1.0.0
+  
+  # Git tag versioning
+  edgit tag create extraction-prompt v1.0.0    # Create version
+  edgit tag create extraction-prompt prod      # Create deployment tag
+  edgit tag list extraction-prompt             # List all tags
+  
+  # Deployment workflows
+  edgit deploy set extraction-prompt v1.0.0 --to staging
+  edgit deploy promote extraction-prompt --from staging --to prod
+  edgit deploy status                          # Show all deployments
+  
+  # Discovery
+  edgit discover scan --type prompt            # Find potential prompts
+  edgit commit                                 # AI-generated commit message
 
-LEGACY COMMANDS (redirected):
-  scan    → discover scan
-  detect  → discover detect
-  history → components history
+KEY CONCEPTS:
+  • Components are minimal manifests (path + type) in .edgit/components.json
+  • All versioning is handled by Git tags: components/<name>/<version>
+  • Version tags (v1.0.0) are immutable, deployment tags (prod) can move
+  • No merge conflicts - Git tags are the source of truth
+  • AI-powered commit messages analyze component changes
 
 GIT PASSTHROUGH:
   All other commands are passed through to git unchanged.
   Examples: edgit branch, edgit log, edgit push, etc.
-
-COMPONENT DETECTION:
-  Prompts:  prompts/**/*.md, **/*.prompt.md
-  Agents:   agents/**/*.{js,ts}, **/*.agent.{js,ts}
-  SQL:      queries/**/*.sql, **/*.query.sql  
-  Configs:  configs/**/*.{yaml,yml}, **/*.config.{yaml,yml}
-
-EXAMPLES:
-  edgit setup                    # Initialize component tracking
-  edgit commit -m "Update prompt" # Auto-version changed components
-  edgit components               # List all components with versions
-  edgit checkout prompt@1.0.0    # Restore specific component version
-  edgit status                   # Git status + component changes
-  
-For more information, visit: https://github.com/ensemble-edge/edgit
-  `);
+`);
 }
 
 /**
@@ -258,11 +271,30 @@ async function main(): Promise<void> {
         
     case 'components':
     case 'component':
+      const componentsCmd = new ComponentsCommand();
       const componentArgs = [subcommand, ...args].filter(Boolean) as string[];
       if (parsed.options.help) {
         componentArgs.push('--help');
       }
-      await manageComponents(componentArgs);
+      await componentsCmd.execute(componentArgs);
+      break;
+      
+    case 'tag':
+      const tagCmd = new TagCommand();
+      const tagArgs = [subcommand, ...args].filter(Boolean) as string[];
+      if (parsed.options.help) {
+        tagArgs.push('--help');
+      }
+      await tagCmd.execute(tagArgs);
+      break;
+      
+    case 'deploy':
+      const deployCmd = new DeployCommand();
+      const deployArgs = [subcommand, ...args].filter(Boolean) as string[];
+      if (parsed.options.help) {
+        deployArgs.push('--help');
+      }
+      await deployCmd.execute(deployArgs);
       break;      case 'discover':
         const discoverCmd = new DiscoverCommand();
         const discoverArgs = [subcommand, ...args].filter(Boolean) as string[];
@@ -315,13 +347,15 @@ async function main(): Promise<void> {
         break;
         
       case 'history':
-        console.log('ℹ️  "edgit history" moved to "edgit components history"');
-        await manageComponents(['history', ...args]);
+        console.log('ℹ️  "edgit history" moved to "edgit components show"');
+        const historyComponentsCmd = new ComponentsCommand();
+        await historyComponentsCmd.execute(['show', ...args]);
         break;
         
       case 'checkout':
         // Direct component checkout shortcut
-        await manageComponents(['checkout', ...args]);
+        const checkoutComponentsCmd = new ComponentsCommand();
+        await checkoutComponentsCmd.execute(['checkout', ...args]);
         break;
         
       case 'status':
