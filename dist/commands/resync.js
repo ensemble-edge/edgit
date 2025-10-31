@@ -210,11 +210,11 @@ Examples:
         if (!detected)
             return;
         const componentName = detected.name;
-        const existingComponent = registry.components[componentName];
+        const existingComponent = ComponentUtils.findComponentByName(registry, componentName);
         if (!existingComponent) {
             // New component - create it
             const component = await this.createComponentFromGitHistory(filePath, detected, options);
-            registry.components[componentName] = component;
+            ComponentUtils.addComponent(registry, component);
             result.changes.added.push(component);
             result.componentsFixed++;
             if (options.verbose) {
@@ -225,7 +225,7 @@ Examples:
             // Existing component - validate and update if needed
             const updated = await this.validateAndUpdateComponent(existingComponent, filePath, detected, options);
             if (updated) {
-                registry.components[componentName] = updated;
+                // Component is already in registry by ID, no need to re-add
                 result.changes.updated.push(updated);
                 result.componentsFixed++;
                 if (options.verbose) {
@@ -247,6 +247,7 @@ Examples:
                 version: currentVersion,
                 commit: currentCommit,
                 timestamp: new Date().toISOString(),
+                path: filePath,
                 message: 'Initial component discovery'
             });
         }
@@ -315,6 +316,7 @@ Examples:
                         version: versionNumber,
                         commit: commit.trim(),
                         timestamp: new Date(timestamp.trim()).toISOString(),
+                        path: filePath,
                         message: message?.trim() || 'No message'
                     });
                 }

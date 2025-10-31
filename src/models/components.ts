@@ -17,6 +17,9 @@ export interface ComponentVersion {
   /** ISO timestamp when this version was created */
   timestamp: string;
   
+  /** File path at the time this version was created */
+  path: string;
+  
   /** Optional commit message associated with this version */
   message?: string;
 }
@@ -241,6 +244,7 @@ export class ComponentUtils {
     type: ComponentType, 
     commit: string,
     message?: string,
+    userBaseName?: string,
     existingComponents?: Record<string, any>
   ): Component {
     const name = this.generateComponentName(filePath, type, existingComponents);
@@ -251,7 +255,8 @@ export class ComponentUtils {
     const versionEntry: ComponentVersion = {
       version,
       commit,
-      timestamp: now
+      timestamp: now,
+      path: filePath
     };
     
     if (message) {
@@ -302,7 +307,8 @@ export class ComponentUtils {
     const versionEntry: ComponentVersion = {
       version,
       commit,
-      timestamp: now
+      timestamp: now,
+      path: filePath
     };
     
     if (message) {

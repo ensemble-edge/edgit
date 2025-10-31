@@ -208,49 +208,88 @@ export class ComponentsCommand extends Command {
         if (!spec.version) {
             throw new Error('Version or tag is required for checkout');
         }
-        const component = registry.components[spec.name];
+        const component = this.findComponent(registry, spec.name);
         if (!component) {
             throw new Error(`Component "${spec.name}" not found`);
         }
         let targetCommit;
         let targetVersion;
-        if (spec.isTag && component.tags?.[spec.version]) {
-            // Tag reference
-            const taggedVersion = component.tags[spec.version];
-            if (!taggedVersion) {
+        let versionEntry;
+        if (spec.isTag) {
+            if (spec.version === 'latest') {
+                // Special "latest" tag - always points to current version
+                targetVersion = component.version;
+                const entry = component.versionHistory.find(v => v.version === targetVersion);
+                if (!entry) {
+                    throw new Error(`Current version "${targetVersion}" not found in history`);
+                }
+                versionEntry = entry;
+                targetCommit = versionEntry.commit;
+                this.showInfo(`Checking out latest version (v${targetVersion})`);
+            }
+            else if (component.tags?.[spec.version]) {
+                // Regular tag reference
+                const taggedVersion = component.tags[spec.version];
+                if (!taggedVersion) {
+                    throw new Error(`Tag "${spec.version}" not found for component "${spec.name}"`);
+                }
+                targetVersion = taggedVersion;
+                const entry = component.versionHistory.find(v => v.version === targetVersion);
+                if (!entry) {
+                    throw new Error(`Tagged version "${targetVersion}" not found in history`);
+                }
+                versionEntry = entry;
+                targetCommit = versionEntry.commit;
+                this.showInfo(`Checking out tag "${spec.version}" (v${targetVersion})`);
+            }
+            else {
                 throw new Error(`Tag "${spec.version}" not found for component "${spec.name}"`);
             }
-            targetVersion = taggedVersion;
-            const versionEntry = component.versionHistory.find(v => v.version === targetVersion);
-            if (!versionEntry) {
-                throw new Error(`Tagged version "${targetVersion}" not found in history`);
-            }
-            targetCommit = versionEntry.commit;
-            this.showInfo(`Checking out tag "${spec.version}" (v${targetVersion})`);
         }
         else {
             // Direct version reference
             targetVersion = spec.version;
-            const versionEntry = component.versionHistory.find(v => v.version === targetVersion);
-            if (!versionEntry) {
+            const entry = component.versionHistory.find(v => v.version === targetVersion);
+            if (!entry) {
                 throw new Error(`Version "${targetVersion}" not found for component "${spec.name}"`);
             }
+            versionEntry = entry;
             targetCommit = versionEntry.commit;
             this.showInfo(`Checking out v${targetVersion}`);
         }
         // Check if file exists at the target commit before attempting checkout
-        const fileExists = await this.git.fileExistsAtCommit(component.path, targetCommit);
+        // Use the path from the version history since file may have been renamed
+        const targetPath = versionEntry.path || component.path; // fallback to current path for old version histories
+        const fileExists = await this.git.fileExistsAtCommit(targetPath, targetCommit);
         if (!fileExists) {
-            throw new Error(`File "${component.path}" does not exist at commit ${targetCommit} (version ${targetVersion}).\n` +
+            throw new Error(`File "${targetPath}" does not exist at commit ${targetCommit} (version ${targetVersion}).\n` +
                 `This might indicate an incorrect version history. Try:\n` +
                 `  • edgit resync "${spec.name}" to rebuild the component history\n` +
                 `  • edgit components show "${spec.name}" to view available versions\n` +
                 `  • Check that the component was properly registered`);
         }
         // Check out the file from the specific commit
-        const success = await this.git.checkoutFile(component.path, targetCommit);
-        if (!success) {
-            throw new Error(`Failed to checkout ${component.path} from commit ${targetCommit}`);
+        // If the file was renamed, checkout to a temp location then move to current location
+        if (targetPath !== component.path) {
+            // File was renamed - checkout to temp location then move
+            const success = await this.git.checkoutFile(targetPath, targetCommit);
+            if (!success) {
+                throw new Error(`Failed to checkout ${targetPath} from commit ${targetCommit}`);
+            }
+            // Move the file to current location
+            try {
+                await fs.rename(targetPath, component.path);
+            }
+            catch (error) {
+                throw new Error(`Failed to move restored file from ${targetPath} to ${component.path}: ${error}`);
+            }
+        }
+        else {
+            // Same path - direct checkout
+            const success = await this.git.checkoutFile(component.path, targetCommit);
+            if (!success) {
+                throw new Error(`Failed to checkout ${component.path} from commit ${targetCommit}`);
+            }
         }
         this.showSuccess(`✅ Restored ${component.path} to v${targetVersion}`);
         this.showWarning('⚠️  File has been modified in working directory. Commit or stash changes if needed.');
@@ -447,18 +486,18 @@ COMPONENT SPECIFICATION:
         if (oldName === newName) {
             throw new Error('Old and new names cannot be the same');
         }
-        const component = registry.components[oldName];
+        // Find component by name (not by registry key)
+        const component = this.findComponent(registry, oldName);
         if (!component) {
             throw new Error(`Component '${oldName}' not found in registry`);
         }
-        if (registry.components[newName]) {
+        // Check if new name already exists
+        const existingComponent = this.findComponent(registry, newName);
+        if (existingComponent) {
             throw new Error(`Component '${newName}' already exists in registry`);
         }
-        // Update component name
+        // Update component name (component stays under same ID key)
         component.name = newName;
-        // Move to new key in registry
-        registry.components[newName] = component;
-        delete registry.components[oldName];
         registry.updated = new Date().toISOString();
         // Update file header if it exists
         try {

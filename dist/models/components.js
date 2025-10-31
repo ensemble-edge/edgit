@@ -113,14 +113,15 @@ export class ComponentUtils {
         return result.name;
     }
     /** Create initial component from file path */
-    static createComponent(filePath, type, commit, message, existingComponents) {
+    static createComponent(filePath, type, commit, message, userBaseName, existingComponents) {
         const name = this.generateComponentName(filePath, type, existingComponents);
         const now = new Date().toISOString();
         const version = '1.0.0';
         const versionEntry = {
             version,
             commit,
-            timestamp: now
+            timestamp: now,
+            path: filePath
         };
         if (message) {
             versionEntry.message = message;
@@ -153,7 +154,8 @@ export class ComponentUtils {
         const versionEntry = {
             version,
             commit,
-            timestamp: now
+            timestamp: now,
+            path: filePath
         };
         if (message) {
             versionEntry.message = message;

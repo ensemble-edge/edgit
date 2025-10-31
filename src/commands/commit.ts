@@ -381,10 +381,8 @@ export class CommitCommand extends Command {
             throw new Error(`❌ Name collision: "${componentName}" is already used by component ${existingByName.id}`);
           }
           
-          // Update registry with new name
-          delete registry.components[component.name]; // Remove old name key
-          component.name = componentName; // Update component name
-          registry.components[componentName] = component; // Add with new name key
+          // Update component name (stays under same ID key)
+          component.name = componentName;
         }
       }
       
@@ -403,7 +401,7 @@ export class CommitCommand extends Command {
           version: '1.0.0',
           versionHistory: []
         };
-        registry.components[componentName] = component;
+        ComponentUtils.addComponent(registry, component);
         
         versionedComponents.push({
           name: componentName,
@@ -452,7 +450,8 @@ export class CommitCommand extends Command {
       const versionEntry: ComponentVersion = {
         version: component!.version, // component is guaranteed to exist here
         commit: currentCommit,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        path: component!.path
       };
 
       if (commitMessage) {

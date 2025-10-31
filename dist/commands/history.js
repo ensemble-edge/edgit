@@ -1,4 +1,5 @@
 import { Command } from './base.js';
+import { ComponentUtils } from '../models/components.js';
 import * as fs from 'fs/promises';
 /**
  * History command for component version history with Git integration
@@ -11,7 +12,7 @@ export class HistoryCommand extends Command {
         const options = this.extractHistoryOptions(parsed);
         const registry = await this.loadComponentsRegistry();
         if (options.component) {
-            await this.showComponentHistory(registry, options.component, options);
+            await this.showSingleComponentHistory(registry, options.component, options);
         }
         else {
             await this.showAllComponentsHistory(registry, options);
@@ -60,8 +61,8 @@ Examples:
             throw new Error('No components registry found. Run "edgit setup" first.');
         }
     }
-    async showComponentHistory(registry, componentName, options) {
-        const component = registry.components[componentName];
+    async showSingleComponentHistory(registry, componentName, options) {
+        const component = ComponentUtils.findComponentByName(registry, componentName);
         if (!component) {
             this.showError(`Component "${componentName}" not found.`);
             return;
@@ -122,11 +123,19 @@ Examples:
         };
     }
     getTagsForVersion(component, version) {
-        if (!component.tags)
-            return [];
-        return Object.entries(component.tags)
-            .filter(([tag, tagVersion]) => tagVersion === version)
-            .map(([tag]) => tag);
+        const tags = [];
+        // Add user-defined tags
+        if (component.tags) {
+            const userTags = Object.entries(component.tags)
+                .filter(([tag, tagVersion]) => tagVersion === version)
+                .map(([tag]) => tag);
+            tags.push(...userTags);
+        }
+        // Add automatic "latest" tag for current version
+        if (version === component.version) {
+            tags.push('latest');
+        }
+        return tags;
     }
     async parseGitDate(dateStr) {
         try {

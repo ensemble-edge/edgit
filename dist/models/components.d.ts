@@ -10,6 +10,8 @@ export interface ComponentVersion {
     commit: string;
     /** ISO timestamp when this version was created */
     timestamp: string;
+    /** File path at the time this version was created */
+    path: string;
     /** Optional commit message associated with this version */
     message?: string;
 }
@@ -122,7 +124,7 @@ export declare class ComponentUtils {
     /** Generate component name from file path */
     static generateComponentName(filePath: string, type: ComponentType, existingComponents?: Record<string, any>): string;
     /** Create initial component from file path */
-    static createComponent(filePath: string, type: ComponentType, commit: string, message?: string, existingComponents?: Record<string, any>): Component;
+    static createComponent(filePath: string, type: ComponentType, commit: string, message?: string, userBaseName?: string, existingComponents?: Record<string, any>): Component;
     /** Create component with Cloudflare-safe naming (async version) */
     static createComponentWithWorkerName(filePath: string, type: ComponentType, commit: string, repoContext: string, message?: string, userBaseName?: string, existingComponents?: Record<string, any>): Promise<Component>;
     /** Create empty registry */

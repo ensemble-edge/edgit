@@ -45,7 +45,7 @@ export class HistoryCommand extends Command {
     const registry = await this.loadComponentsRegistry();
     
     if (options.component) {
-      await this.showComponentHistory(registry, options.component, options);
+      await this.showSingleComponentHistory(registry, options.component, options);
     } else {
       await this.showAllComponentsHistory(registry, options);
     }
@@ -96,12 +96,12 @@ Examples:
     }
   }
 
-  private async showComponentHistory(
+  private async showSingleComponentHistory(
     registry: ComponentRegistry, 
     componentName: string, 
     options: HistoryOptions
   ): Promise<void> {
-    const component = registry.components[componentName];
+    const component = ComponentUtils.findComponentByName(registry, componentName);
     if (!component) {
       this.showError(`Component "${componentName}" not found.`);
       return;
@@ -184,11 +184,22 @@ Examples:
   }
 
   private getTagsForVersion(component: Component, version: string): string[] {
-    if (!component.tags) return [];
+    const tags: string[] = [];
     
-    return Object.entries(component.tags)
-      .filter(([tag, tagVersion]) => tagVersion === version)
-      .map(([tag]) => tag);
+    // Add user-defined tags
+    if (component.tags) {
+      const userTags = Object.entries(component.tags)
+        .filter(([tag, tagVersion]) => tagVersion === version)
+        .map(([tag]) => tag);
+      tags.push(...userTags);
+    }
+    
+    // Add automatic "latest" tag for current version
+    if (version === component.version) {
+      tags.push('latest');
+    }
+    
+    return tags;
   }
 
   private async parseGitDate(dateStr: string): Promise<Date> {

@@ -189,6 +189,7 @@ Note: Headers are added by default for hybrid versioning. Use --without-header t
         version: options.version || '1.0.0',
         commit: currentCommit,
         timestamp: new Date().toISOString(),
+        path: filePath,
         message: wasExisting ? 'Component re-registered' : 'Initial component registration'
       }]
     };

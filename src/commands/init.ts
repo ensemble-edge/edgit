@@ -221,7 +221,7 @@ export class InitCommand extends Command {
     
     // Add all components to registry
     for (const component of components) {
-      registry.components[component.name] = component;
+      ComponentUtils.addComponent(registry, component);
     }
 
     // Add metadata

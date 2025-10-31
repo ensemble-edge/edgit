@@ -32,7 +32,7 @@ export declare class HistoryCommand extends Command {
     getHelp(): string;
     private extractHistoryOptions;
     private loadComponentsRegistry;
-    private showComponentHistory;
+    private showSingleComponentHistory;
     private showAllComponentsHistory;
     private buildComponentHistory;
     private getTagsForVersion;
