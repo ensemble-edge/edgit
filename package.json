@@ -30,7 +30,10 @@
     "conventional-changelog-conventionalcommits": "^9.1.0",
     "typescript": "^5.9.3"
   },
-  "repository": "https://github.com/ensemble-edge/edgit",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ensemble-edge/edgit.git"
+  },
   "publishConfig": {
     "access": "public"
   },
