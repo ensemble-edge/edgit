@@ -336,7 +336,7 @@ export class ComponentsCommand extends Command {
       throw new Error('Component name and tag name are required');
     }
 
-    const component = registry.components[componentName];
+    const component = this.findComponent(registry, componentName);
     if (!component) {
       throw new Error(`Component "${componentName}" not found`);
     }
