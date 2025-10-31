@@ -172,7 +172,7 @@ Edge deployment makes this 100x more critical:
 - �️ **Git tag-based versioning** - All versions stored as native Git tags
 - 🔄 **Zero merge conflicts** - No version data in tracked files
 - 🎯 **Automatic component detection** - Smart file pattern recognition
-- 🤖 **AI-powered commit messages** - Optional intelligent commit descriptions
+- 🤖 **AI-powered commit messages** - OpenAI integration for intelligent commit descriptions
 - 📦 **Independent component versions** - Version and deploy components separately
 - � **Deployment tag management** - Moveable tags for staging, prod, etc.
 - ⚡ **Native Git performance** - Zero overhead, pure Git operations
@@ -257,11 +257,59 @@ components/data-agent/prod         → locked into v2.1.3 stable reality
 
 Edgit automatically detects component realities by file patterns:
 ```bash
-*.prompt.md         → prompt component multiverse
-*.agent.js          → agent component timeline
-*.query.sql         → sql component reality
-config/*.json       → config component dimension
+# Prompt Components
+prompts/**/*        → prompt component multiverse
+*.prompt.md         → prompt files anywhere
+instructions/**/*   → instruction templates
+templates/**/*      → template files
+
+# Agent Components  
+agents/**/*         → agent component timeline
+scripts/**/*.js     → JavaScript agents
+scripts/**/*.ts     → TypeScript agents  
+scripts/**/*.py     → Python agents
+scripts/**/*.sh     → Shell script agents (NEW!)
+scripts/**/*.bash   → Bash script agents (NEW!)
+*.agent.*          → agent files anywhere
+
+# SQL Components
+queries/**/*        → sql component reality
+sql/**/*           → SQL directories
+database/**/*      → database files
+*.sql              → SQL files anywhere
+*.query.*          → query files
+
+# Config Components
+configs/**/*        → config component dimension
+config/**/*        → configuration directories
+settings/**/*      → settings files
+*.config.*         → config files anywhere
+*.yaml, *.yml      → YAML configurations
+*.json             → JSON configurations
+*.toml, *.ini      → Other config formats
 ```
+
+### Intelligent Collision Detection
+
+Edgit prevents component naming conflicts with smart collision detection:
+
+```bash
+# When conflicts are detected
+❌ Component name collision detected: "auth-prompt" already exists.
+   Suggested alternatives: auth-prompt-2, auth-prompt-3, auth-prompt-new
+   File: prompts/duplicate-auth.prompt.md
+
+# Automatic suggestions include:
+• Numbered variants: component-2, component-3
+• Descriptive suffixes: component-new, component-alt, component-v2
+• Smart type detection: prevents "prompt-prompt" duplicates
+```
+
+**Collision Protection Features:**
+- **Fail-fast approach**: Stops initialization rather than silent overwrites
+- **Helpful suggestions**: Provides ready-to-use alternative names
+- **Registry awareness**: Checks existing components before naming
+- **Smart suffix detection**: Avoids duplicate type suffixes
 
 ### Workflow Integration: Seamless Multiverse Travel
 
@@ -306,6 +354,28 @@ edgit deploy promote <component> <from> <to>       # Promote between envs
 edgit commit [-m message]           # AI-assisted or manual commit
 ```
 
+### AI Integration Setup
+
+Configure OpenAI for intelligent commit message generation:
+
+```bash
+# Add your OpenAI API key to .env
+echo "OPENAI_API_KEY=sk-proj-..." >> .env
+
+# AI will analyze your changes and generate contextual commits
+edgit commit
+# Example output: "feat(auth-prompt): enhance security with MFA token support"
+
+# Manual override still available
+edgit commit -m "your custom message"
+```
+
+**AI Commit Features:**
+- **Context-aware analysis**: Understands component types and changes
+- **Conventional commit format**: Follows standard commit conventions
+- **Component scope detection**: Automatically identifies affected components
+- **Fallback gracefully**: Works without API key (manual mode)
+
 ### Legacy Commands (Deprecated)
 
 These commands now provide migration guidance:
@@ -347,6 +417,140 @@ edgit deploy set my-component v1.0.0 --to prod
 - ✅ Easier debugging and inspection
 
 ## Technical Details
+
+### Enhanced Error Handling & User Experience
+
+Edgit provides comprehensive error handling with actionable guidance:
+
+```bash
+# Component naming conflicts
+❌ Component name collision detected: "auth-prompt" already exists.
+   Suggested alternatives: auth-prompt-2, auth-prompt-3, auth-prompt-new
+   File: prompts/duplicate-auth.prompt.md
+
+# Version tag conflicts  
+❌ Version tag already exists: components/my-component/v1.0.0
+   Use --force to overwrite or choose a different version
+
+# Deployment validation
+❌ Cannot deploy: version v2.0.0 does not exist for component "my-component"
+   Available versions: v1.0.0, v1.1.0
+   Create version first: edgit tag create my-component v2.0.0
+```
+
+### Enhanced Component Type Detection
+
+**Expanded Agent Support**: Now includes shell scripting support
+```bash
+# All supported agent types
+scripts/**/*.js     → JavaScript agents
+scripts/**/*.ts     → TypeScript agents  
+scripts/**/*.py     → Python agents
+scripts/**/*.sh     → Shell script agents (NEW!)
+scripts/**/*.bash   → Bash script agents (NEW!)
+agents/**/*         → Any file in agents directory
+*.agent.*          → Agent files anywhere
+```
+
+**Smart Pattern Matching**: Comprehensive file pattern recognition
+```bash
+# Prompt patterns
+prompts/**/*        → Dedicated prompts directory
+*.prompt.md         → Prompt files anywhere  
+instructions/**/*   → Instruction templates
+templates/**/*      → Template files
+
+# Configuration patterns  
+configs/**/*        → Configuration directories
+settings/**/*       → Settings files
+*.config.*         → Config files with .config. in name
+*.yaml, *.yml      → YAML configuration files
+*.json             → JSON configuration files
+*.toml, *.ini      → Additional config formats
+
+# SQL patterns
+queries/**/*        → SQL query directories
+sql/**/*           → SQL directories
+database/**/*      → Database-related files
+*.sql              → SQL files anywhere
+*.query.*          → Query files with .query. in name
+```
+
+### Component Name Collisions
+
+**Problem**: Multiple files generate the same component name
+```bash
+❌ Component name collision detected: "auth-prompt" already exists.
+```
+
+**Solutions**:
+```bash
+# Option 1: Use suggested alternatives
+# Rename one file using the suggestions provided
+
+# Option 2: Use more specific naming
+mv prompts/auth.prompt.md prompts/user-auth.prompt.md
+mv prompts/admin-auth.prompt.md prompts/admin-auth.prompt.md
+
+# Option 3: Organize in subdirectories
+mkdir prompts/user && mv prompts/auth.prompt.md prompts/user/auth.prompt.md
+```
+
+### AI Commit Issues
+
+**Problem**: AI commits failing or generating poor messages
+```bash
+# Check API key setup
+cat .env | grep OPENAI_API_KEY
+
+# Test with manual fallback
+edgit commit -m "manual commit message"
+
+# Debug mode (if available)
+DEBUG=true edgit commit
+```
+
+### Git Tag Management
+
+**Problem**: Deployment showing wrong versions
+```bash
+# Check what tags actually exist
+git tag -l "components/*"
+
+# Verify tag points to expected commit
+git show components/my-component/v1.0.0
+
+# Fix deployment tag if needed
+edgit deploy set my-component v1.0.0 --to prod
+```
+
+### Performance Issues
+
+**Problem**: Slow component detection in large repositories
+```bash
+# Limit scan scope (if many files)
+# Focus on specific directories during init
+
+# Use .gitignore to exclude irrelevant files
+echo "node_modules/" >> .gitignore
+echo "dist/" >> .gitignore
+```
+
+### Migration Problems
+
+**Problem**: Upgrading from legacy Edgit versions
+```bash
+# Backup existing registry
+cp .edgit/components.json .edgit/components.json.backup
+
+# Force reinitialize with new system
+edgit init --force
+
+# Recreate tags for existing components
+edgit tag create my-component v1.0.0
+```
+
+## Advanced Scenarios
 
 ### Tag Format Specification
 
