@@ -1,6 +1,7 @@
 import * as path from 'path';
 import { minimatch } from 'minimatch';
 import { GitWrapper } from './git.js';
+import { ComponentNameGenerator } from './component-name-generator.js';
 import type { ComponentType, Component } from '../models/components.js';
 
 export interface DetectionPattern {
@@ -84,7 +85,7 @@ export class ComponentDetector {
   }
 
   /**
-   * Generate component name from file path
+   * Generate component name from file path using smart naming logic
    */
   private generateComponentName(filePath: string, type: ComponentType): string {
     const fileName = path.basename(filePath);
@@ -94,13 +95,9 @@ export class ComponentDetector {
       throw new Error(`Cannot generate component name from file: ${filePath}`);
     }
     
-    // Remove common suffixes if present
-    const cleanName = baseName
-      .replace(/\.(prompt|agent|query|config)$/, '')
-      .replace(/[^a-zA-Z0-9-_]/g, '-')
-      .toLowerCase();
-    
-    return `${cleanName}-${type}`;
+    // Use the smart ComponentNameGenerator that handles suffix detection
+    const result = ComponentNameGenerator.generateComponentName(baseName, type);
+    return result.name;
   }
 
   /**

@@ -580,14 +580,9 @@ COMPONENT SPECIFICATION:
    * Find component by name or display name
    */
   private findComponent(registry: ComponentRegistry, nameOrDisplayName: string): Component | undefined {
-    // First try exact match by name (worker name)
-    let component = registry.components[nameOrDisplayName];
-    if (component) {
-      return component;
-    }
-    
-    // Component not found
-    return undefined;
+    // Search through all components to find by name
+    const components = Object.values(registry.components);
+    return components.find(comp => comp.name === nameOrDisplayName);
   }
 
   /**

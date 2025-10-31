@@ -488,13 +488,9 @@ COMPONENT SPECIFICATION:
      * Find component by name or display name
      */
     findComponent(registry, nameOrDisplayName) {
-        // First try exact match by name (worker name)
-        let component = registry.components[nameOrDisplayName];
-        if (component) {
-            return component;
-        }
-        // Component not found
-        return undefined;
+        // Search through all components to find by name
+        const components = Object.values(registry.components);
+        return components.find(comp => comp.name === nameOrDisplayName);
     }
     /**
      * Show worker names for Cloudflare deployment

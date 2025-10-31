@@ -10,7 +10,7 @@ export interface ScanOptions {
   pattern?: string | undefined;
   type?: string | undefined;
   withHeaders?: boolean | undefined;
-  untracked?: boolean | undefined;
+  trackedOnly?: boolean | undefined;
   output?: 'table' | 'json' | 'simple';
 }
 
@@ -70,7 +70,7 @@ export class ScanCommand extends Command {
       pattern: parsed.options.pattern,
       type: parsed.options.type,
       withHeaders: parsed.flags['with-headers'],
-      untracked: parsed.flags.untracked,
+      trackedOnly: parsed.flags['tracked-only'],
       output: (parsed.options.output as 'table' | 'json' | 'simple') || 'table'
     };
   }
@@ -81,22 +81,23 @@ export class ScanCommand extends Command {
       return await this.findFilesByPattern(options.pattern);
     }
     
-    // Get all tracked files
-    const files = await this.findAllFiles();
-    
-    if (options.untracked) {
-      // Add untracked files
-      const result = await this.git.exec(['ls-files', '--others', '--exclude-standard']);
-      const untracked = result.stdout.split('\n').filter((f: string) => f.trim());
-      files.push(...untracked);
+    if (options.trackedOnly) {
+      // Only scan git-tracked files
+      return await this.findTrackedFiles();
     }
     
-    return files;
+    // Default: scan all files in workspace (tracked + untracked)
+    const trackedFiles = await this.findTrackedFiles();
+    const untrackedFiles = await this.findUntrackedFiles();
+    
+    // Combine and deduplicate
+    const allFiles = [...new Set([...trackedFiles, ...untrackedFiles])];
+    return allFiles;
   }
 
   private async findFilesByPattern(pattern: string): Promise<string[]> {
     // Simple glob-like pattern matching
-    const files = await this.findAllFiles();
+    const files = await this.findTrackedFiles();
     return files.filter(file => {
       // Convert glob pattern to regex
       const regex = pattern
@@ -107,12 +108,22 @@ export class ScanCommand extends Command {
     });
   }
 
-  private async findAllFiles(): Promise<string[]> {
+  private async findTrackedFiles(): Promise<string[]> {
     try {
       const result = await this.git.exec(['ls-files']);
       return result.stdout.split('\n').filter((f: string) => f.trim());
     } catch (error) {
-      console.error('Error listing files:', error);
+      console.error('Error listing tracked files:', error);
+      return [];
+    }
+  }
+
+  private async findUntrackedFiles(): Promise<string[]> {
+    try {
+      const result = await this.git.exec(['ls-files', '--others', '--exclude-standard']);
+      return result.stdout.split('\n').filter((f: string) => f.trim());
+    } catch (error) {
+      console.error('Error listing untracked files:', error);
       return [];
     }
   }
@@ -190,19 +201,20 @@ export class ScanCommand extends Command {
 Usage: edgit scan [options]
 
 Scan the repository for potential components that can be managed by Edgit.
+By default, scans all files in the workspace (tracked and untracked).
 
 Options:
   -p, --pattern <glob>    Scan files matching specific pattern
   -t, --type <type>       Filter by component type (prompt|agent|sql|config)
   --with-headers          Only show files with version headers
-  -u, --untracked         Include untracked files
+  --tracked-only          Only scan git-tracked files (exclude untracked)
   -o, --output <format>   Output format: table (default), json, simple
 
 Examples:
-  edgit scan                     # Scan all files
+  edgit scan                     # Scan all files (default)
   edgit scan --type prompt       # Only scan for prompts
   edgit scan --pattern "*.md"    # Scan only Markdown files
-  edgit scan --with-headers      # Show files that already have headers
+  edgit scan --tracked-only      # Only scan git-tracked files
   edgit scan --output json       # JSON output for scripting
     `.trim();
   }

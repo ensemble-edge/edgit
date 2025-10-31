@@ -3,7 +3,7 @@ export interface ScanOptions {
     pattern?: string | undefined;
     type?: string | undefined;
     withHeaders?: boolean | undefined;
-    untracked?: boolean | undefined;
+    trackedOnly?: boolean | undefined;
     output?: 'table' | 'json' | 'simple';
 }
 export interface ScanResult {
@@ -23,7 +23,8 @@ export declare class ScanCommand extends Command {
     private extractScanOptions;
     private getFilesToScan;
     private findFilesByPattern;
-    private findAllFiles;
+    private findTrackedFiles;
+    private findUntrackedFiles;
     private analyzeFile;
     private isFileRegistered;
     getHelp(): string;

@@ -24,7 +24,7 @@ export declare class ComponentDetector {
         name: string;
     } | null;
     /**
-     * Generate component name from file path
+     * Generate component name from file path using smart naming logic
      */
     private generateComponentName;
     /**

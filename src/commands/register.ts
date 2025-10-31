@@ -180,7 +180,7 @@ Note: Headers are added by default for hybrid versioning. Use --without-header t
     
     // Create or update component
     const component: Component = {
-      id: ComponentNameGenerator.generateComponentId(),
+      id: existing?.id || ComponentNameGenerator.generateComponentId(),
       name: componentName,
       type: componentType,
       path: filePath,
@@ -196,6 +196,16 @@ Note: Headers are added by default for hybrid versioning. Use --without-header t
     // Preserve existing tags if updating
     if (existing?.tags) {
       component.tags = existing.tags;
+    }
+    
+    // When using --force, clean up any duplicate entries with same name but different ID
+    if (options.force && existing) {
+      const allComponents = ComponentUtils.getAllComponents(registry);
+      for (const comp of allComponents) {
+        if (comp.name === componentName && comp.id !== component.id) {
+          ComponentUtils.removeComponent(registry, comp.id);
+        }
+      }
     }
     
     // Add to registry (keyed by ID)

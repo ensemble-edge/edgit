@@ -10,6 +10,11 @@ export interface ComponentMetadata {
     type?: ComponentType;
     updated?: string;
 }
+export interface UserComponentHeader {
+    name?: string;
+    type?: string;
+    description?: string;
+}
 export interface HeaderFormat {
     prefix: string;
     suffix: string;
@@ -27,6 +32,10 @@ export declare const YAML_METADATA_BLOCK = "_edgit:\n  version: \"{version}\"\n 
  * File header manager class
  */
 export declare class FileHeaderManager {
+    /**
+     * Read user-defined component headers (like "# Component: name")
+     */
+    readUserHeader(filePath: string): Promise<UserComponentHeader | null>;
     /**
      * Read component metadata from file header
      */

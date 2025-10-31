@@ -15,6 +15,12 @@ export interface ComponentMetadata {
   updated?: string;
 }
 
+export interface UserComponentHeader {
+  name?: string;
+  type?: string;
+  description?: string;
+}
+
 export interface HeaderFormat {
   prefix: string;
   suffix: string;
@@ -106,6 +112,44 @@ export const YAML_METADATA_BLOCK = `_edgit:
 export class FileHeaderManager {
   
   /**
+   * Read user-defined component headers (like "# Component: name")
+   */
+  async readUserHeader(filePath: string): Promise<UserComponentHeader | null> {
+    try {
+      const content = await fs.readFile(filePath, 'utf8');
+      const lines = content.split('\n').slice(0, 10); // Only check first 10 lines
+      
+      const header: UserComponentHeader = {};
+      
+      for (const line of lines) {
+        const trimmed = line.trim();
+        
+        // Match patterns like "# Component: name" or "// Component: name"
+        const componentMatch = trimmed.match(/^[#\/\*\-]*\s*Component:\s*(.+)$/i);
+        if (componentMatch && componentMatch[1]) {
+          header.name = componentMatch[1].trim();
+        }
+        
+        // Match patterns like "# Type: prompt" or "// Type: prompt"  
+        const typeMatch = trimmed.match(/^[#\/\*\-]*\s*Type:\s*(.+)$/i);
+        if (typeMatch && typeMatch[1]) {
+          header.type = typeMatch[1].trim().toLowerCase();
+        }
+        
+        // Match patterns like "# Description: text" or "// Description: text"
+        const descMatch = trimmed.match(/^[#\/\*\-]*\s*Description:\s*(.+)$/i);
+        if (descMatch && descMatch[1]) {
+          header.description = descMatch[1].trim();
+        }
+      }
+      
+      return Object.keys(header).length > 0 ? header : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Read component metadata from file header
    */
   async readMetadata(filePath: string): Promise<ComponentMetadata | null> {
@@ -165,7 +209,7 @@ export class FileHeaderManager {
       format = {
         prefix: '<!-- ',
         suffix: ' -->',
-        template: 'Edgit: version={version} component={component}'
+        template: 'Edgit: id={componentId} version={version} component={component}'
       };
     }
     
@@ -201,20 +245,20 @@ export class FileHeaderManager {
         return {
           prefix: '-- ',
           suffix: '',
-          template: 'Edgit: version={version} component={component}'
+          template: 'Edgit: id={componentId} version={version} component={component}'
         };
       case 'config':
         return {
           prefix: '# ',
           suffix: '',
-          template: 'Edgit: version={version} component={component}'
+          template: 'Edgit: id={componentId} version={version} component={component}'
         };
       case 'agent':
         // Assume scripts - use /* */ comments
         return {
           prefix: '/* ',
           suffix: ' */',
-          template: 'Edgit: version={version} component={component}'
+          template: 'Edgit: id={componentId} version={version} component={component}'
         };
       case 'prompt':
       default:
@@ -222,7 +266,7 @@ export class FileHeaderManager {
         return {
           prefix: '<!-- ',
           suffix: ' -->',
-          template: 'Edgit: version={version} component={component}'
+          template: 'Edgit: id={componentId} version={version} component={component}'
         };
     }
   }

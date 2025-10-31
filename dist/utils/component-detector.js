@@ -1,6 +1,7 @@
 import * as path from 'path';
 import { minimatch } from 'minimatch';
 import { GitWrapper } from './git.js';
+import { ComponentNameGenerator } from './component-name-generator.js';
 /**
  * ComponentDetector handles detecting which components changed in commits
  * and determining component types from file paths
@@ -67,7 +68,7 @@ export class ComponentDetector {
         return null;
     }
     /**
-     * Generate component name from file path
+     * Generate component name from file path using smart naming logic
      */
     generateComponentName(filePath, type) {
         const fileName = path.basename(filePath);
@@ -75,12 +76,9 @@ export class ComponentDetector {
         if (!baseName) {
             throw new Error(`Cannot generate component name from file: ${filePath}`);
         }
-        // Remove common suffixes if present
-        const cleanName = baseName
-            .replace(/\.(prompt|agent|query|config)$/, '')
-            .replace(/[^a-zA-Z0-9-_]/g, '-')
-            .toLowerCase();
-        return `${cleanName}-${type}`;
+        // Use the smart ComponentNameGenerator that handles suffix detection
+        const result = ComponentNameGenerator.generateComponentName(baseName, type);
+        return result.name;
     }
     /**
      * Get changed components from git diff
