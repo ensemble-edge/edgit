@@ -95,8 +95,8 @@ export class DeployCommand extends Command {
       console.log(`✅ Deployed ${componentName}@${version} to ${environment}`);
       console.log(`   Git tag: ${gitTag} → ${sha.substring(0, 8)}`);
       
-      // Show what's now deployed
-      await this.showEnvironmentStatus(componentName, environment);
+      // Show what's now deployed with the specific version that was deployed
+      await this.showSpecificDeployment(componentName, environment, version, sha);
       
       console.log(`\n💡 Push with: git push origin ${gitTag} --force`);
       
@@ -359,19 +359,33 @@ export class DeployCommand extends Command {
       const sha = await this.tagManager.getTagSHA(componentName, environment);
       const tagInfo = await this.tagManager.getTagInfo(componentName, environment);
       
-      // Try to find which version this SHA corresponds to
-      const versionTags = await this.tagManager.getVersionTags(componentName);
+      // Try to extract version from deployment tag message first
       let version = 'custom';
+      const deployMessage = tagInfo.message;
+      const versionMatch = deployMessage.match(/@(v?[\d\.\w\-]+)\s+to\s+/);
       
-      for (const versionTag of versionTags) {
-        try {
-          const versionSHA = await this.tagManager.getTagSHA(componentName, versionTag);
-          if (versionSHA === sha) {
-            version = versionTag;
-            break;
+      if (versionMatch) {
+        // Found version in deployment tag message
+        version = versionMatch[1]!;
+      } else {
+        // Fallback: find matching version tags and use the latest one
+        const versionTags = await this.tagManager.getVersionTags(componentName);
+        const matchingVersions: string[] = [];
+        
+        for (const versionTag of versionTags) {
+          try {
+            const versionSHA = await this.tagManager.getTagSHA(componentName, versionTag);
+            if (versionSHA === sha) {
+              matchingVersions.push(versionTag);
+            }
+          } catch {
+            // Continue searching
           }
-        } catch {
-          // Continue searching
+        }
+        
+        // If we found matching versions, use the latest one (last in sorted array)
+        if (matchingVersions.length > 0) {
+          version = matchingVersions[matchingVersions.length - 1]!;
         }
       }
       
@@ -379,6 +393,18 @@ export class DeployCommand extends Command {
       
     } catch (error) {
       console.log(`${indent}${environment}: not deployed`);
+    }
+  }
+
+  /**
+   * Show deployment confirmation with the specific version that was deployed
+   */
+  private async showSpecificDeployment(componentName: string, environment: string, version: string, sha: string): Promise<void> {
+    try {
+      const tagInfo = await this.tagManager.getTagInfo(componentName, environment);
+      console.log(`   ${environment}: ${version} (${sha.substring(0, 8)}) - ${tagInfo.date}`);
+    } catch (error) {
+      console.log(`   ${environment}: ${version} (${sha.substring(0, 8)}) - just deployed`);
     }
   }
 
