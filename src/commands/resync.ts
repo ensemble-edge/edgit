@@ -144,10 +144,8 @@ Examples:
         await this.rebuildVersionHistory(registry, result, options);
       }
 
-      // Fix file headers if requested
-      if (options.fixHeaders) {
-        await this.fixFileHeaders(registry, result, options);
-      }
+      // Always fix missing file headers during resync
+      await this.fixFileHeaders(registry, result, options);
 
       // Save updated registry
       if (!options.dryRun && (result.componentsFixed > 0 || options.force)) {
@@ -304,27 +302,52 @@ Examples:
     // Build version history from Git first
     const versionHistory = await this.buildVersionHistoryFromGit(filePath);
     
-    // Get current version from file header, or latest from git history, or default to 1.0.0
+    // Get current version from file header
     const headerMetadata = await fileHeaderManager.readMetadata(filePath);
-    let currentVersion = headerMetadata?.version;
+    const headerVersion = headerMetadata?.version;
     
-    if (!currentVersion) {
-      // No header version - use latest from git history or default
-      if (versionHistory.length > 0) {
-        // Sort versions and use the latest
-        const sortedVersions = versionHistory.slice().sort((a, b) => {
-          try {
-            const vA = new (require('../models/components.js').SemVer)(a.version);
-            const vB = new (require('../models/components.js').SemVer)(b.version);
-            return vB.compare(vA); // Latest first
-          } catch {
-            return b.timestamp.localeCompare(a.timestamp);
-          }
-        });
-        currentVersion = sortedVersions[0]?.version || '1.0.0';
-      } else {
-        currentVersion = '1.0.0';
+    // Get latest version from git history
+    let gitLatestVersion: string | null = null;
+    if (versionHistory.length > 0) {
+      // Sort versions and use the latest
+      const sortedVersions = versionHistory.slice().sort((a, b) => {
+        try {
+          const vA = new (require('../models/components.js').SemVer)(a.version);
+          const vB = new (require('../models/components.js').SemVer)(b.version);
+          return vB.compare(vA); // Latest first
+        } catch {
+          return b.timestamp.localeCompare(a.timestamp);
+        }
+      });
+      gitLatestVersion = sortedVersions[0]?.version || null;
+    }
+    
+    // Determine the correct current version
+    let currentVersion: string;
+    if (headerVersion && gitLatestVersion) {
+      // Both available - use the higher version (in case git history has newer versions)
+      try {
+        const hVer = new (require('../models/components.js').SemVer)(headerVersion);
+        const gVer = new (require('../models/components.js').SemVer)(gitLatestVersion);
+        currentVersion = gVer.compare(hVer) > 0 ? gitLatestVersion : headerVersion;
+        
+        if (currentVersion === gitLatestVersion && currentVersion !== headerVersion) {
+          console.log(`📝 Using git history version ${gitLatestVersion} for ${detected.name} (header: ${headerVersion})`);
+        }
+      } catch {
+        // Fallback to git version if comparison fails
+        currentVersion = gitLatestVersion;
       }
+    } else if (headerVersion) {
+      // Only header available
+      currentVersion = headerVersion;
+    } else if (gitLatestVersion) {
+      // Only git history available
+      currentVersion = gitLatestVersion;
+      console.log(`📝 Using git history version ${gitLatestVersion} for ${detected.name} (no header)`);
+    } else {
+      // Neither available - new component
+      currentVersion = '1.0.0';
     }
     
     // If no history found, create initial version
@@ -649,13 +672,15 @@ Examples:
   ): Promise<void> {
     for (const [name, component] of Object.entries(registry.components)) {
       try {
-        const hasHeader = !!(await fileHeaderManager.readMetadata(component.path));
+        const headerMetadata = await fileHeaderManager.readMetadata(component.path);
         
-        if (!hasHeader) {
+        if (!headerMetadata) {
+          // Missing header - add it
           if (!options.dryRun) {
             await fileHeaderManager.writeMetadata(component.path, {
               version: component.version,
-              component: component.name
+              component: component.name,
+              componentId: component.id
             });
           }
           
@@ -665,10 +690,105 @@ Examples:
           if (options.verbose) {
             console.log(`📄 Added header to ${component.path}`);
           }
+        } else if (headerMetadata.version !== component.version) {
+          // Version mismatch detected - bump from the higher version to be safe
+          const registryVersion = component.version;
+          const headerVersion = headerMetadata.version;
+          
+          // Determine which version is higher
+          const higherVersion = this.compareVersions(registryVersion, headerVersion) >= 0 
+            ? registryVersion 
+            : headerVersion;
+          
+          // Calculate next version after the higher version
+          const nextVersion = this.bumpVersion(higherVersion, 'patch');
+          
+          // Update component in registry
+          component.version = nextVersion;
+          component.versionHistory.push({
+            version: nextVersion,
+            commit: await this.getCurrentCommit() || 'unknown',
+            timestamp: new Date().toISOString(),
+            path: component.path,
+            message: `Version mismatch resolved: registry v${registryVersion} vs header v${headerVersion} (used higher: v${higherVersion})`
+          });
+          
+          // Update file header
+          if (!options.dryRun) {
+            await fileHeaderManager.writeMetadata(component.path, {
+              version: nextVersion,
+              component: component.name,
+              componentId: component.id
+            }, { replace: true });
+          }
+          
+          result.changes.headerUpdates.push(component.path);
+          result.headersFixed++;
+          result.componentsFixed++;
+          
+          console.log(`🔄 Version mismatch resolved for ${component.name}: registry v${registryVersion} vs header v${headerVersion} → v${nextVersion} (used higher: v${higherVersion})`);
+          
+          if (options.verbose) {
+            console.log(`📄 Updated header for ${component.path} to v${nextVersion}`);
+          }
         }
       } catch (error) {
         result.errors.push(`Failed to update header for ${component.path}: ${error}`);
       }
+    }
+  }
+
+  /**
+   * Bump a semantic version
+   */
+  private bumpVersion(version: string, type: 'major' | 'minor' | 'patch' = 'patch'): string {
+    try {
+      const parts = version.split('.').map(Number);
+      if (parts.length !== 3 || parts.some(isNaN)) throw new Error('Invalid version format');
+      
+      const major = parts[0]!;
+      const minor = parts[1]!;
+      const patch = parts[2]!;
+      
+      switch (type) {
+        case 'major':
+          return `${major + 1}.0.0`;
+        case 'minor':
+          return `${major}.${minor + 1}.0`;
+        case 'patch':
+        default:
+          return `${major}.${minor}.${patch + 1}`;
+      }
+    } catch {
+      // Fallback for invalid version formats
+      return '1.0.1';
+    }
+  }
+
+  /**
+   * Compare two semantic versions
+   * @returns > 0 if v1 > v2, < 0 if v1 < v2, 0 if equal
+   */
+  private compareVersions(v1: string, v2: string): number {
+    try {
+      const parts1 = v1.split('.').map(Number);
+      const parts2 = v2.split('.').map(Number);
+      
+      if (parts1.length !== 3 || parts2.length !== 3 || 
+          parts1.some(isNaN) || parts2.some(isNaN)) {
+        // Fallback to string comparison for invalid formats
+        return v1.localeCompare(v2);
+      }
+      
+      const [major1, minor1, patch1] = parts1;
+      const [major2, minor2, patch2] = parts2;
+      
+      if (major1! !== major2!) return major1! - major2!;
+      if (minor1! !== minor2!) return minor1! - minor2!;
+      return patch1! - patch2!;
+    } catch {
+      // Fallback to string comparison
+      return v1.localeCompare(v2);
     }
   }
 

@@ -58,6 +58,15 @@ export declare class ResyncCommand extends Command {
     private removeDeletedComponents;
     private rebuildVersionHistory;
     private fixFileHeaders;
+    /**
+     * Bump a semantic version
+     */
+    private bumpVersion;
+    /**
+     * Compare two semantic versions
+     * @returns > 0 if v1 > v2, < 0 if v1 < v2, 0 if equal
+     */
+    private compareVersions;
     private saveRegistry;
     private outputResult;
 }
