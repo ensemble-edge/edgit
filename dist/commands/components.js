@@ -452,29 +452,52 @@ COMPONENT SPECIFICATION:
         if (!componentName) {
             throw new Error('Component name is required for remove command');
         }
-        const component = registry.components[componentName];
+        const component = this.findComponent(registry, componentName);
         if (!component) {
             throw new Error(`Component '${componentName}' not found in registry`);
         }
         // Confirm deletion unless --force flag is used
         if (!flags.force) {
             console.log(`\n🗑️  About to remove component: ${componentName}`);
+            console.log(`   ID: ${component.id}`);
             console.log(`   Path: ${component.path}`);
             console.log(`   Version: ${component.version}`);
             console.log(`   History: ${component.versionHistory.length} versions`);
             console.log('\n⚠️  This will remove the component from the registry but NOT delete the file.');
+            console.log('   The file header will be marked as deregistered.');
             console.log('   Use --force to skip this confirmation.');
             // In a real implementation, you'd use readline for user input
             // For now, require --force flag
             throw new Error('Add --force flag to confirm component removal');
         }
         // Remove from registry
-        delete registry.components[componentName];
+        delete registry.components[component.id];
         registry.updated = new Date().toISOString();
+        // Mark file header as deregistered (if header exists)
+        try {
+            const { fileHeaderManager } = await import('../utils/file-headers.js');
+            const existingHeader = await fileHeaderManager.readMetadata(component.path);
+            if (existingHeader) {
+                // Update header to mark as deregistered
+                await fileHeaderManager.writeMetadata(component.path, {
+                    version: component.version,
+                    component: `${component.name} [DEREGISTERED]`,
+                    componentId: component.id
+                }, {
+                    replace: true,
+                    componentType: component.type
+                });
+                console.log(`📝 Marked file header as deregistered: ${component.path}`);
+            }
+        }
+        catch (error) {
+            console.warn(`⚠️  Could not update file header: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
         // Save updated registry
         await this.saveComponentsRegistry(registry);
         console.log(`✅ Removed component '${componentName}' from registry`);
         console.log('💡 The file still exists and can be re-registered if needed');
+        console.log('💡 File header has been marked as [DEREGISTERED] for tracking');
     }
     /**
      * Rename component in registry

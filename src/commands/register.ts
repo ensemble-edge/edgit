@@ -178,15 +178,29 @@ Note: Headers are added by default for hybrid versioning. Use --without-header t
     // Get current commit
     const currentCommit = await this.getCurrentCommit();
     
+    // Determine version to use - check for previous versions if not explicitly provided
+    let versionToUse = options.version;
+    if (!versionToUse || versionToUse === '1.0.0') {
+      const previousVersion = await this.detectPreviousVersion(resolvedFilePath, componentName);
+      if (previousVersion) {
+        versionToUse = previousVersion;
+        console.log(`📝 Continuing from previous version: ${previousVersion}`);
+      } else {
+        versionToUse = '1.0.0';
+      }
+    }
+    // Ensure versionToUse is always a string
+    const finalVersion: string = versionToUse || '1.0.0';
+    
     // Create or update component
     const component: Component = {
       id: existing?.id || ComponentNameGenerator.generateComponentId(),
       name: componentName,
       type: componentType,
       path: filePath,
-      version: options.version || '1.0.0',
+      version: finalVersion,
       versionHistory: existing?.versionHistory || [{
-        version: options.version || '1.0.0',
+        version: finalVersion,
         commit: currentCommit,
         timestamp: new Date().toISOString(),
         path: filePath,
@@ -220,12 +234,23 @@ Note: Headers are added by default for hybrid versioning. Use --without-header t
     if (shouldAddHeader) {
       const existingHeader = await fileHeaderManager.readMetadata(resolvedFilePath);
       
-      if (!existingHeader || options.updateHeader) {
+      // Check if header is deregistered and needs updating
+      let needsUpdate = !existingHeader || options.updateHeader;
+      if (existingHeader) {
+        const fileContent = await fs.readFile(resolvedFilePath, 'utf-8');
+        const lines = fileContent.split('\n');
+        const firstLine = lines[0];
+        if (firstLine && firstLine.includes('[DEREGISTERED]')) {
+          needsUpdate = true; // Always update deregistered headers
+        }
+      }
+      
+      if (needsUpdate) {
         const writeOptions: { replace?: boolean; componentType?: ComponentType } = {
           componentType: componentType
         };
         
-        if (options.updateHeader) {
+        if (needsUpdate) {
           writeOptions.replace = true;
         }
         
@@ -363,6 +388,51 @@ Note: Headers are added by default for hybrid versioning. Use --without-header t
     
     if (!headerAdded && !options.withoutHeader) {
       console.log(`   edgit register ${component.path} --update-header  # Add version header`);
+    }
+  }
+
+  /**
+   * Detect previous version from deregistered header or git history
+   */
+  private async detectPreviousVersion(filePath: string, componentName: string): Promise<string | null> {
+    try {
+      // First, check for deregistered header in the file
+      const existingHeader = await fileHeaderManager.readMetadata(filePath);
+      if (existingHeader && existingHeader.version) {
+        // Check if it's marked as deregistered
+        const fileContent = await fs.readFile(filePath, 'utf-8');
+        const lines = fileContent.split('\n');
+        const firstLine = lines[0];
+        if (firstLine && firstLine.includes('[DEREGISTERED]')) {
+          return existingHeader.version;
+        }
+      }
+
+      // Second, check git history for this component name
+      try {
+        const historyCommand = ['log', '--oneline', `--grep=component=${componentName}`, `--grep=Component: ${componentName}`];
+        const historyResult = await this.git.exec(historyCommand);
+        
+        if (historyResult.stdout.trim()) {
+          // Try to extract version from commit messages using git log
+          const versionCommand = ['log', '-p', `--grep=component=${componentName}`, '--', filePath];
+          const versionResult = await this.git.exec(versionCommand);
+          
+          if (versionResult.stdout.trim()) {
+            const versionMatch = versionResult.stdout.match(/version=([0-9]+\.[0-9]+\.[0-9]+)/);
+            if (versionMatch && versionMatch[1]) {
+              return versionMatch[1];
+            }
+          }
+        }
+      } catch (gitError) {
+        // Git history check failed, continue to return null
+      }
+
+      return null;
+    } catch (error) {
+      // If any error occurs, return null to fall back to 1.0.0
+      return null;
     }
   }
 }

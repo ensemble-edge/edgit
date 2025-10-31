@@ -33,6 +33,11 @@ export interface ResyncResult {
  */
 export class ResyncCommand extends Command {
   async execute(args: string[]): Promise<void> {
+    if (this.shouldShowHelp(args)) {
+      console.log(this.getHelp());
+      return;
+    }
+
     await this.validateGitRepo();
     await this.validateGitInstalled();
     

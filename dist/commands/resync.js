@@ -9,6 +9,10 @@ import * as fs from 'fs/promises';
  */
 export class ResyncCommand extends Command {
     async execute(args) {
+        if (this.shouldShowHelp(args)) {
+            console.log(this.getHelp());
+            return;
+        }
         await this.validateGitRepo();
         await this.validateGitInstalled();
         const parsed = this.parseArgs(args);

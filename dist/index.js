@@ -115,6 +115,8 @@ COMPONENT MANAGEMENT:
   components history <name>    Show version history
   components checkout <comp@ver>   Restore component version
   components tag <name> <tag>      Tag component versions
+  components remove <name>     Remove component from registry
+  register <file>      Manually register file as component
 
 DISCOVERY & ANALYSIS:
   discover scan [options]      Find potential components
@@ -183,11 +185,11 @@ async function main() {
             await showVersion();
             return;
         }
-        if (parsed.options.help || !parsed.command) {
+        // Only show main help if no command specified, or if help requested for main command
+        if (!parsed.command || (parsed.options.help && !parsed.command)) {
             showHelp();
             return;
-        }
-        // Set working directory if specified
+        } // Set working directory if specified
         let workspaceDir = parsed.workspace;
         if (parsed.command !== 'init' && parsed.command !== 'setup') {
             try {
@@ -219,15 +221,27 @@ async function main() {
                 break;
             case 'components':
             case 'component':
-                await manageComponents([subcommand, ...args].filter(Boolean));
+                const componentArgs = [subcommand, ...args].filter(Boolean);
+                if (parsed.options.help) {
+                    componentArgs.push('--help');
+                }
+                await manageComponents(componentArgs);
                 break;
             case 'discover':
                 const discoverCmd = new DiscoverCommand();
-                await discoverCmd.execute([subcommand, ...args].filter(Boolean));
+                const discoverArgs = [subcommand, ...args].filter(Boolean);
+                if (parsed.options.help) {
+                    discoverArgs.push('--help');
+                }
+                await discoverCmd.execute(discoverArgs);
                 break;
             case 'detect':
                 const detectCmd = new DetectCommand();
-                await detectCmd.execute(args);
+                const detectArgs = [...args];
+                if (parsed.options.help) {
+                    detectArgs.push('--help');
+                }
+                await detectCmd.execute(detectArgs);
                 break;
             case 'scan':
                 console.log('ℹ️  "edgit scan" moved to "edgit discover scan"');
@@ -236,15 +250,27 @@ async function main() {
                 break;
             case 'register':
                 const registerCmd = new RegisterCommand();
-                await registerCmd.execute(args);
+                const registerArgs = [...args];
+                if (parsed.options.help) {
+                    registerArgs.push('--help');
+                }
+                await registerCmd.execute(registerArgs);
                 break;
             case 'resync':
                 const resyncCmd = new ResyncCommand();
-                await resyncCmd.execute(args);
+                const resyncArgs = [...args];
+                if (parsed.options.help) {
+                    resyncArgs.push('--help');
+                }
+                await resyncCmd.execute(resyncArgs);
                 break;
             case 'patterns':
                 const patternsCmd = new PatternsCommand();
-                await patternsCmd.execute([subcommand, ...args].filter(Boolean));
+                const patternsArgs = [subcommand, ...args].filter(Boolean);
+                if (parsed.options.help) {
+                    patternsArgs.push('--help');
+                }
+                await patternsCmd.execute(patternsArgs);
                 break;
             case 'history':
                 console.log('ℹ️  "edgit history" moved to "edgit components history"');

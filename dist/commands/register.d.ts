@@ -30,5 +30,9 @@ export declare class RegisterCommand extends Command {
     private promptForName;
     private saveRegistry;
     private outputResult;
+    /**
+     * Detect previous version from deregistered header or git history
+     */
+    private detectPreviousVersion;
 }
 //# sourceMappingURL=register.d.ts.map
