@@ -401,7 +401,7 @@ export class FileHeaderManager {
     
     const fullHeader = format.prefix + headerText + format.suffix;
     
-    if (existing && !replace) {
+    if (existing && replace) {
       // Replace existing header
       const patterns = [
         /<!--\s*Edgit:.*?-->/,

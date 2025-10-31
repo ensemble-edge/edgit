@@ -47,7 +47,7 @@ export class CommitCommand extends Command {
             if (versionedComponents.length > 0) {
                 // HYBRID VERSIONING: Sync file headers before commit
                 for (const versionedComponent of versionedComponents) {
-                    const component = registry.components[versionedComponent.name];
+                    const component = ComponentUtils.findComponentByName(registry, versionedComponent.name);
                     if (component) {
                         await this.syncFileHeader(component);
                     }
@@ -364,11 +364,20 @@ export class CommitCommand extends Command {
                     replace: true,
                     componentType: component.type
                 });
-                // Stage the updated file header
-                await this.git.add([component.path]);
             }
-            // Note: We don't create headers if they don't exist during commit
-            // Headers are created during registration or explicit commands
+            else {
+                // Create missing header for tracked component
+                await fileHeaderManager.writeMetadata(filePath, {
+                    version: component.version,
+                    component: component.name,
+                    componentId: component.id
+                }, {
+                    replace: false,
+                    componentType: component.type
+                });
+            }
+            // Stage the updated file header
+            await this.git.add([component.path]);
         }
         catch (error) {
             // Log warning but don't fail the commit

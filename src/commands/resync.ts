@@ -296,12 +296,31 @@ Examples:
     detected: { type: any; name: string },
     options: ResyncOptions
   ): Promise<Component> {
-    // Get current version from file header or default to 1.0.0
-    const headerMetadata = await fileHeaderManager.readMetadata(filePath);
-    const currentVersion = headerMetadata?.version || '1.0.0';
-
-    // Build version history from Git
+    // Build version history from Git first
     const versionHistory = await this.buildVersionHistoryFromGit(filePath);
+    
+    // Get current version from file header, or latest from git history, or default to 1.0.0
+    const headerMetadata = await fileHeaderManager.readMetadata(filePath);
+    let currentVersion = headerMetadata?.version;
+    
+    if (!currentVersion) {
+      // No header version - use latest from git history or default
+      if (versionHistory.length > 0) {
+        // Sort versions and use the latest
+        const sortedVersions = versionHistory.slice().sort((a, b) => {
+          try {
+            const vA = new (require('../models/components.js').SemVer)(a.version);
+            const vB = new (require('../models/components.js').SemVer)(b.version);
+            return vB.compare(vA); // Latest first
+          } catch {
+            return b.timestamp.localeCompare(a.timestamp);
+          }
+        });
+        currentVersion = sortedVersions[0]?.version || '1.0.0';
+      } else {
+        currentVersion = '1.0.0';
+      }
+    }
     
     // If no history found, create initial version
     if (versionHistory.length === 0) {
@@ -344,6 +363,18 @@ Examples:
     if (component.type !== detected.type) {
       updated.type = detected.type;
       needsUpdate = true;
+    }
+
+    // Check if version matches header
+    const { fileHeaderManager } = await import('../utils/file-headers.js');
+    const headerMetadata = await fileHeaderManager.readMetadata(filePath);
+    const headerVersion = headerMetadata?.version;
+    if (headerVersion && component.version !== headerVersion) {
+      updated.version = headerVersion;
+      needsUpdate = true;
+      if (options.verbose) {
+        console.log(`🔄 Updated version from header: ${component.version} → ${headerVersion}`);
+      }
     }
 
     // Validate version history
