@@ -222,9 +222,9 @@ export class InitCommand extends Command {
   ): Promise<void> {
     const registry: ComponentRegistry = ComponentUtils.createEmptyRegistry();
     
-    // Add all components to registry
+    // Add all components to registry with collision detection
     for (const component of components) {
-      const componentName = ComponentUtils.generateComponentName(component.path, component.type);
+      const componentName = ComponentUtils.generateComponentName(component.path, component.type, registry);
       ComponentUtils.addComponent(registry, componentName, component);
     }
 

@@ -3,6 +3,8 @@
  * Components are now minimal manifests with all versioning handled by Git tags
  */
 
+import { ComponentNameGenerator } from '../utils/component-name-generator.js';
+
 export type ComponentType = 'prompt' | 'agent' | 'sql' | 'config';
 
 /**
@@ -83,17 +85,34 @@ export class ComponentSpecParser {
  * Helper functions for component management
  */
 export class ComponentUtils {
-  /** Generate component name from file path */
-  static generateComponentName(filePath: string, type: ComponentType): string {
+  /** Generate component name from file path with collision detection */
+  static generateComponentName(filePath: string, type: ComponentType, existingComponents?: ComponentRegistry): string {
     const fileName = filePath.split('/').pop() || 'unknown';
     const baseName = fileName.split('.')[0] || 'unknown';
     
-    // Simple naming: basename-type (unless basename already includes type)
-    if (baseName.includes(type)) {
-      return baseName;
+    // Use the sophisticated ComponentNameGenerator with collision detection
+    const result = ComponentNameGenerator.generateComponentName(
+      baseName, 
+      type, 
+      existingComponents?.components
+    );
+    
+    // If collision detected, throw error with suggestions
+    if (result.collision?.detected) {
+      const suggestions = result.collision.suggestions.join(', ');
+      throw new Error(
+        `Component name collision detected: "${result.name}" already exists.\n` +
+        `Suggested alternatives: ${suggestions}\n` +
+        `File: ${filePath}`
+      );
     }
     
-    return `${baseName}-${type}`;
+    // Log warning if name was normalized
+    if (result.warning) {
+      console.warn(`⚠️  ${result.warning}`);
+    }
+    
+    return result.name;
   }
 
   /** Create initial component from file path */

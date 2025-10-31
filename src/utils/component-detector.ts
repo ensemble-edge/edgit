@@ -35,6 +35,8 @@ export class ComponentDetector {
       'scripts/**/*.js', 
       'scripts/**/*.ts', 
       'scripts/**/*.py',
+      'scripts/**/*.sh',   // Shell scripts
+      'scripts/**/*.bash', // Bash scripts
       '**/*.agent.*',      // Files with .agent in name
       '**/agent*'          // Files starting with "agent"
     ],
