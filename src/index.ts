@@ -379,8 +379,19 @@ async function main(): Promise<void> {
   }
 }
 
-// Execute if running directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Execute if running directly (handle both direct execution and npm bin symlinks)
+const currentFileUrl = import.meta.url;
+const currentFilePath = new URL(currentFileUrl).pathname;
+const calledScript = process.argv[1];
+
+// Check if this script is being executed directly or via npm bin
+const isDirectExecution = calledScript && (
+  currentFilePath === calledScript ||                    // Direct execution
+  currentFileUrl === `file://${calledScript}` ||        // Direct with file:// protocol  
+  calledScript.includes('edgit')                         // npm bin symlink
+);
+
+if (isDirectExecution) {
   main().catch((error) => {
     console.error('❌', error.message || error);
     process.exit(1);
