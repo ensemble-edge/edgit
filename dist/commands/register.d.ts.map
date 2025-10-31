@@ -1,0 +1,1 @@
+{"version":3,"file":"register.d.ts","sourceRoot":"","sources":["../../src/commands/register.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,OAAO,EAAE,MAAM,WAAW,CAAC;AAEpC;;GAEG;AACH,qBAAa,eAAgB,SAAQ,OAAO;IACpC,OAAO,CAAC,IAAI,EAAE,MAAM,EAAE,GAAG,OAAO,CAAC,IAAI,CAAC;IAgB5C,OAAO,IAAI,MAAM;CAUlB"}
