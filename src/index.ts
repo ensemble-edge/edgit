@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+// Load environment variables first
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { GitWrapper } from './utils/git.js';
 import { setupEdgit } from './commands/init.js';
 import { manageComponents } from './commands/components.js';

@@ -311,6 +311,61 @@ export class GitWrapper {
     const result = await this.exec(args);
     return result.exitCode === 0;
   }
+
+  /**
+   * Get git diff for specific files
+   */
+  async getDiff(filePaths?: string[]): Promise<string> {
+    const args = ['diff'];
+    if (filePaths && filePaths.length > 0) {
+      args.push('--', ...filePaths);
+    }
+    
+    const result = await this.exec(args);
+    return result.stdout;
+  }
+
+  /**
+   * Get current branch name
+   */
+  async getCurrentBranch(): Promise<string | null> {
+    try {
+      const result = await this.exec(['branch', '--show-current']);
+      return result.exitCode === 0 ? result.stdout.trim() || null : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Get commit history
+   */
+  async getCommitHistory(count: number = 10): Promise<string[]> {
+    try {
+      const result = await this.exec(['log', '--oneline', `-${count}`]);
+      if (result.exitCode === 0) {
+        return result.stdout.trim().split('\n').filter(line => line.length > 0);
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Get staged files
+   */
+  async getStagedFiles(): Promise<string[]> {
+    try {
+      const result = await this.exec(['diff', '--cached', '--name-only']);
+      if (result.exitCode === 0) {
+        return result.stdout.trim().split('\n').filter(line => line.length > 0);
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  }
 }
 
 /**

@@ -26,5 +26,9 @@
   "repository": "https://github.com/ensemble-edge/edgit",
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "minimatch": "^10.1.1"
   }
 }

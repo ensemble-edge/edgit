@@ -1,0 +1,307 @@
+import { 
+  AIConfig, 
+  AIProvider, 
+  AIResponse, 
+  CommitContext, 
+  ComponentChange,
+  ComponentType,
+  PromptTemplates 
+} from '../types/ai-commit.js';
+
+/**
+ * Simple OpenAI client with graceful error handling
+ */
+class OpenAIProvider implements AIProvider {
+  private apiKey: string;
+  private model: string;
+  private timeout: number;
+
+  constructor(apiKey: string, model: string = 'gpt-4-turbo-preview', timeout: number = 10000) {
+    this.apiKey = apiKey;
+    this.model = model;
+    this.timeout = timeout;
+  }
+
+  async generateRepoMessage(context: CommitContext): Promise<string> {
+    const prompt = this.buildRepoPrompt(context);
+    return this.callOpenAI(prompt);
+  }
+
+  async generateComponentMessage(component: ComponentChange): Promise<string> {
+    const prompt = this.buildComponentPrompt(component);
+    return this.callOpenAI(prompt);
+  }
+
+  private buildRepoPrompt(context: CommitContext): string {
+    const { components, overallDiff } = context;
+    
+    if (components.length === 1) {
+      const comp = components[0]!;
+      return PROMPT_TEMPLATES.repoSingleComponent
+        .replace('${componentName}', comp.name)
+        .replace('${componentType}', comp.type)
+        .replace('${diff}', this.truncateDiff(comp.diff, 1500));
+    }
+
+    const componentSummary = components
+      .map(c => {
+        const action = c.oldVersion === '0.0.0' || !c.oldVersion ? 'new' : 'modified';
+        return `• ${c.name} (${c.type}) - ${action}`;
+      })
+      .join('\n');
+
+    return PROMPT_TEMPLATES.repoMultiComponent
+      .replace('${count}', components.length.toString())
+      .replace('${componentSummary}', componentSummary)
+      .replace('${stats}', this.truncateDiff(overallDiff, 800));
+  }
+
+  private buildComponentPrompt(component: ComponentChange): string {
+    const template = this.getComponentTemplate(component.type);
+    return template
+      .replace('${componentName}', component.name)
+      .replace('${diff}', this.truncateDiff(component.diff, 2000));
+  }
+
+  private getComponentTemplate(type: ComponentType): string {
+    switch (type) {
+      case 'prompt': return PROMPT_TEMPLATES.componentPrompt;
+      case 'agent': return PROMPT_TEMPLATES.componentAgent;
+      case 'sql': return PROMPT_TEMPLATES.componentSQL;
+      case 'config': return PROMPT_TEMPLATES.componentConfig;
+      default: return PROMPT_TEMPLATES.componentPrompt;
+    }
+  }
+
+  private truncateDiff(diff: string, maxLength: number): string {
+    if (diff.length <= maxLength) return diff;
+    
+    // Smart truncation: keep headers and important changes
+    const lines = diff.split('\n');
+    const important = lines.filter(line => 
+      line.startsWith('+++') || 
+      line.startsWith('---') || 
+      line.startsWith('@@') ||
+      line.includes('TODO') ||
+      line.includes('BREAKING') ||
+      line.trim().startsWith('+') ||
+      line.trim().startsWith('-')
+    );
+    
+    const truncated = important.join('\n').slice(0, maxLength);
+    return truncated + '\n\n[... diff truncated ...]';
+  }
+
+  private async callOpenAI(prompt: string): Promise<string> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert at writing clear, concise Git commit messages. Follow conventional commit format when appropriate.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_tokens: 100,
+          temperature: 0.3,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const message = data.choices?.[0]?.message?.content?.trim();
+      
+      if (!message) {
+        throw new Error('Empty response from OpenAI');
+      }
+
+      return message;
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        throw new Error('OpenAI request timed out');
+      }
+      throw error;
+    }
+  }
+}
+
+/**
+ * Main AI commit orchestrator
+ */
+export class AICommitManager {
+  private config: AIConfig;
+  private provider?: AIProvider;
+
+  constructor(config: AIConfig) {
+    this.config = config;
+    this.initializeProvider();
+  }
+
+  private initializeProvider(): void {
+    if (this.config.mode === 'off') return;
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      console.warn('⚠️  OPENAI_API_KEY not found in environment. AI features disabled.');
+      return;
+    }
+
+    if (this.config.provider === 'openai') {
+      this.provider = new OpenAIProvider(apiKey, this.config.model, this.config.timeout);
+    }
+  }
+
+  async generateRepoMessage(context: CommitContext): Promise<AIResponse> {
+    if (!this.provider || this.config.mode === 'off') {
+      return { success: false, error: 'AI disabled' };
+    }
+
+    try {
+      const message = await this.provider.generateRepoMessage(context);
+      return { success: true, message };
+    } catch (error: any) {
+      console.warn(`⚠️  AI repo message generation failed: ${error.message}`);
+      return { 
+        success: false, 
+        error: error.message,
+        fallback: true 
+      };
+    }
+  }
+
+  async generateComponentMessage(component: ComponentChange): Promise<AIResponse> {
+    if (!this.provider || !this.config.generateComponentMessages) {
+      return { 
+        success: false, 
+        message: `Updated ${component.name} to v${component.newVersion}`,
+        fallback: true 
+      };
+    }
+
+    try {
+      const message = await this.provider.generateComponentMessage(component);
+      return { success: true, message };
+    } catch (error: any) {
+      console.warn(`⚠️  AI component message generation failed for ${component.name}: ${error.message}`);
+      return { 
+        success: false, 
+        message: `Updated ${component.name} to v${component.newVersion}`,
+        fallback: true 
+      };
+    }
+  }
+
+  isEnabled(): boolean {
+    return this.config.mode !== 'off' && !!this.provider;
+  }
+
+  getMode(): string {
+    return this.config.mode;
+  }
+}
+
+/**
+ * Prompt templates for different scenarios
+ */
+const PROMPT_TEMPLATES: PromptTemplates = {
+  repoMultiComponent: `Create a Git commit message for these component changes:
+
+\${componentSummary}
+
+Changes: \${stats}
+
+IMPORTANT: Return ONLY the commit message, nothing else.
+Analyze the component names and types to understand the business purpose.
+Format: type(scope): description
+Examples:
+- "feat: add user validation and cleanup automation"
+- "feat(api): enhance rate limiting and error handling" 
+- "fix: resolve data processing and config issues"
+Maximum 72 characters. Be specific about functionality, not just component types.`,
+
+  repoSingleComponent: `Generate a Git commit message for \${componentName} (\${componentType}):
+
+\${diff}
+
+Format: type(\${componentName}): description
+Keep it under 72 characters. Focus on the main change.`,
+
+  componentPrompt: `Describe what changed in this AI prompt component:
+
+\${diff}
+
+Be specific about:
+- New patterns or instructions added
+- Improvements to existing guidance  
+- Constraints or formatting changes
+
+One clear sentence describing the change, no prefix or component name.`,
+
+  componentAgent: `Describe what changed in this agent code:
+
+\${diff}
+
+Focus on:
+- New capabilities or features
+- Performance improvements
+- Bug fixes or error handling
+- API or interface changes
+
+One clear sentence describing the change, no prefix.`,
+
+  componentSQL: `Describe this SQL query change:
+
+\${diff}
+
+Mention:
+- Tables or data affected
+- Query optimization or performance
+- New data fields or relationships
+- Filter or join changes
+
+One clear sentence describing the change, no prefix.`,
+
+  componentConfig: `Describe this configuration change:
+
+\${diff}
+
+Focus on:
+- New settings or options
+- Parameter adjustments
+- Feature toggles
+- Performance tuning
+
+One clear sentence describing the change, no prefix.`
+};
+
+/**
+ * Default AI configuration
+ */
+export const DEFAULT_AI_CONFIG: AIConfig = {
+  mode: 'auto',
+  provider: 'openai',
+  model: 'gpt-4-turbo-preview',
+  maxDiffSize: 10000,
+  timeout: 10000,
+  generateComponentMessages: true,
+  includeVersionsInCommit: false
+};

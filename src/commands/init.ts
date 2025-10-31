@@ -71,7 +71,10 @@ export class InitCommand extends Command {
       // Step 4: Update .gitignore (optional)
       await this.updateGitignore(repoRoot, flags.gitignore !== false);
 
-      // Step 5: Show results
+      // Step 5: Setup environment for AI features
+      await this.setupEnvironment(repoRoot);
+
+      // Step 6: Show results
       await this.showResults(components, repoRoot);
 
       this.showSuccess('Edgit initialization complete!');
@@ -242,7 +245,16 @@ export class InitCommand extends Command {
           repository: repositoryInfo,
           config: {
             defaultBump: 'patch',
-            useFileHeaders: options.headers || false
+            useFileHeaders: options.headers || false,
+            ai: {
+              mode: 'auto',
+              provider: 'openai',
+              model: 'gpt-4-turbo-preview',
+              maxDiffSize: 10000,
+              timeout: 10000,
+              generateComponentMessages: true,
+              includeVersionsInCommit: false
+            }
           }
         };
       } catch {
@@ -321,6 +333,70 @@ export class InitCommand extends Command {
     console.log('   • Modify a component file and run "edgit commit" to auto-version it');
     console.log('   • Use "edgit components" to list all tracked components');
     console.log('   • Use "edgit checkout component@version" to restore old versions');
+  }
+
+  /**
+   * Setup environment configuration for AI features
+   */
+  private async setupEnvironment(repoRoot: string): Promise<void> {
+    const envPath = path.join(repoRoot, '.env');
+    
+    try {
+      // Check if .env already exists
+      const envExists = await fs.access(envPath).then(() => true).catch(() => false);
+      
+      if (!envExists) {
+        // Create .env template with AI configuration
+        const envTemplate = `# Edgit AI Configuration
+# Get your OpenAI API key from: https://platform.openai.com/api-keys
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Optional: Customize AI behavior
+# EDGIT_AI_MODEL=gpt-3.5-turbo
+# EDGIT_AI_TIMEOUT=30000
+`;
+        
+        await fs.writeFile(envPath, envTemplate, 'utf8');
+        console.log('   • Created .env template for AI configuration');
+      }
+      
+      // Ensure .env is in .gitignore
+      await this.ensureInGitignore(repoRoot, '.env');
+      
+    } catch (error) {
+      console.warn(`   ⚠️  Warning: Could not setup environment: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Ensure a pattern exists in .gitignore
+   */
+  private async ensureInGitignore(repoRoot: string, pattern: string): Promise<void> {
+    const gitignorePath = path.join(repoRoot, '.gitignore');
+    
+    try {
+      let gitignoreContent = '';
+      
+      // Read existing .gitignore if it exists
+      try {
+        gitignoreContent = await fs.readFile(gitignorePath, 'utf8');
+      } catch (error) {
+        // .gitignore doesn't exist, will be created
+      }
+      
+      // Check if pattern already exists
+      const lines = gitignoreContent.split('\n');
+      const patternExists = lines.some(line => line.trim() === pattern);
+      
+      if (!patternExists) {
+        // Add pattern to .gitignore
+        const newContent = gitignoreContent.trim() + (gitignoreContent.trim() ? '\n' : '') + pattern + '\n';
+        await fs.writeFile(gitignorePath, newContent, 'utf8');
+        console.log(`   • Added ${pattern} to .gitignore`);
+      }
+    } catch (error) {
+      console.warn(`   ⚠️  Warning: Could not update .gitignore: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   getHelp(): string {

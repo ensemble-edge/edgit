@@ -90,6 +90,17 @@ export interface ComponentRegistry {
       
       /** Whether using custom patterns */
       customPatterns?: boolean;
+      
+      /** AI-powered commit configuration */
+      ai?: {
+        mode: 'auto' | 'enhance' | 'off';
+        provider: 'openai';
+        model: string;
+        maxDiffSize: number;
+        timeout: number;
+        generateComponentMessages: boolean;
+        includeVersionsInCommit: boolean;
+      };
     };
   };
 }

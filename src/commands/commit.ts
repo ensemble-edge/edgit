@@ -5,7 +5,10 @@ import { GitWrapper } from '../utils/git.js';
 import { ComponentDetector } from '../utils/component-detector.js';
 import { fileHeaderManager } from '../utils/file-headers.js';
 import { ComponentNameGenerator } from '../utils/component-name-generator.js';
+import { AICommitManager } from '../utils/ai-commit.js';
+import { ChangelogManager, type ComponentVersionChange } from '../utils/changelog.js';
 import type { ComponentRegistry, Component, ComponentVersion, ComponentType } from '../models/components.js';
+import type { ComponentChange } from '../types/ai-commit.js';
 import { SemVer, ComponentUtils } from '../models/components.js';
 
 /**
@@ -82,9 +85,22 @@ export class CommitCommand extends Command {
         this.showInfo(`Auto-versioned ${versionedComponents.length} components`);
       }
 
+      // Generate AI commit message if needed
+      let finalGitArgs = this.filterGitArgs(args);
+      finalGitArgs = await this.enhanceWithAICommitMessage(
+        finalGitArgs, 
+        commitMessage, 
+        changedComponents, 
+        registry
+      );
+
       // Proceed with git commit (filter out edgit-specific flags)
-      const gitArgs = this.filterGitArgs(args);
-      await this.git.passthrough(['commit', ...gitArgs]);
+      await this.git.passthrough(['commit', ...finalGitArgs]);
+
+      // Update changelog after successful commit
+      if (versionedComponents.length > 0) {
+        await this.updateChangelog(versionedComponents, commitMessage || '', registry);
+      }
 
       // Show versioning summary after successful commit
       if (versionedComponents.length > 0) {
@@ -540,9 +556,198 @@ export class CommitCommand extends Command {
     console.log('💡 Use "edgit checkout component@version" to restore any version');
   }
 
+  /**
+   * Update CHANGELOG.md with component version changes
+   */
+  private async updateChangelog(
+    versionedComponents: Array<{
+      name: string;
+      oldVersion: string;
+      newVersion: string;
+      action: string;
+    }>,
+    commitMessage: string,
+    registry: ComponentRegistry
+  ): Promise<void> {
+    try {
+      const repoRoot = await this.git.getRepoRoot();
+      if (!repoRoot) return;
+
+      // Check if changelog updates are enabled
+      const aiConfig = registry.metadata?.config?.ai;
+      if (aiConfig?.mode === 'off') return; // Skip if AI is disabled
+
+      const changelogManager = new ChangelogManager(repoRoot);
+      
+      // Convert versioned components to changelog format
+      const versionChanges: ComponentVersionChange[] = versionedComponents.map(comp => {
+        // Find component to get type
+        const component = ComponentUtils.findComponentByName(registry, comp.name);
+        const componentType = component?.type || 'unknown';
+        
+        return {
+          name: comp.name,
+          type: componentType,
+          oldVersion: comp.oldVersion,
+          newVersion: comp.newVersion,
+          action: comp.action as 'created' | 'updated' | 'renamed' | 'deleted',
+          message: commitMessage
+        };
+      });
+
+      // Generate AI-powered changelog entries if enabled
+      let aiGeneratedEntries: Map<string, string> | undefined;
+      if (aiConfig?.generateComponentMessages) {
+        aiGeneratedEntries = await this.generateChangelogEntries(versionChanges, aiConfig);
+      }
+
+      // Update changelog
+      await changelogManager.updateChangelog(versionChanges, commitMessage, aiGeneratedEntries);
+
+      // Stage the changelog if it was created/updated
+      if (await changelogManager.exists()) {
+        await this.git.add([changelogManager.getFilePath()]);
+        console.log('📝 Staged CHANGELOG.md for next commit');
+      }
+
+    } catch (error) {
+      console.warn(`⚠️  Warning: Could not update changelog: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Generate AI-powered changelog entries for components
+   */
+  private async generateChangelogEntries(
+    versionChanges: ComponentVersionChange[],
+    aiConfig: any
+  ): Promise<Map<string, string>> {
+    const entries = new Map<string, string>();
+    
+    try {
+      const aiManager = new AICommitManager(aiConfig);
+      
+      for (const change of versionChanges) {
+        if (change.action === 'created' || change.action === 'updated') {
+          const componentChange = {
+            name: change.name,
+            type: change.type as any,
+            path: '',
+            oldVersion: change.oldVersion,
+            newVersion: change.newVersion,
+            diff: '', // We don't have diff context here
+          };
+
+          const result = await aiManager.generateComponentMessage(componentChange);
+          if (result.success && result.message) {
+            entries.set(change.name, result.message);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️  Could not generate AI changelog entries:', error);
+    }
+    
+    return entries;
+  }
+
   private filterGitArgs(args: string[]): string[] {
     const edgitFlags = ['--major', '--minor', '--patch'];
     return args.filter(arg => !edgitFlags.includes(arg));
+  }
+
+  /**
+   * Enhance git args with AI-generated commit message if needed
+   */
+  private async enhanceWithAICommitMessage(
+    gitArgs: string[],
+    existingMessage: string | undefined,
+    changedComponents: Array<{
+      type: ComponentType;
+      name: string;
+      path: string;
+      action: 'added' | 'modified' | 'deleted';
+      componentId?: string;
+    }>,
+    registry: ComponentRegistry
+  ): Promise<string[]> {
+    // If message already provided, use it as-is
+    if (existingMessage) {
+      return gitArgs;
+    }
+
+    // Check if AI is enabled in config
+    const aiConfig = registry.metadata?.config?.ai;
+    if (!aiConfig || aiConfig.mode === 'off') {
+      return gitArgs;
+    }
+
+    // Only auto-generate if mode is 'auto' and no message provided
+    if (aiConfig.mode !== 'auto') {
+      return gitArgs;
+    }
+
+    try {
+      this.showInfo('🤖 Generating AI commit message...');
+      
+      // Convert changed components to ComponentChange format
+      const componentChanges: ComponentChange[] = await Promise.all(
+        changedComponents.map(async (comp) => {
+          // Get the actual diff for this component
+          const diff = await this.git.getDiff([comp.path]);
+          
+          // Find existing component to get version info
+          const existingComponent = ComponentUtils.findComponentByName(registry, comp.name);
+          const oldVersion = existingComponent?.version || '0.0.0';
+          
+          // Calculate new version (simplified for now)
+          const currentVersion = new SemVer(oldVersion);
+          const newVersion = comp.action === 'added' ? '1.0.0' : currentVersion.bumpPatch().toString();
+          
+          return {
+            name: comp.name,
+            type: comp.type,
+            path: comp.path,
+            action: comp.action,
+            diff: diff || '',
+            oldVersion,
+            newVersion
+          };
+        })
+      );
+
+      // Get current branch and recent commits for context
+      const currentBranch = await this.git.getCurrentBranch();
+      const recentCommits = await this.git.getCommitHistory(5);
+      const stagedFiles = await this.git.getStagedFiles();
+      
+      // Get overall diff for context
+      const overallDiff = await this.git.getDiff();
+
+      // Generate AI commit message
+      const aiManager = new AICommitManager(aiConfig);
+      const aiResponse = await aiManager.generateRepoMessage({
+        components: componentChanges,
+        stagedFiles: stagedFiles,
+        overallDiff: overallDiff
+      });
+
+      if (aiResponse.success && aiResponse.message) {
+        console.log(`📝 AI generated message: "${aiResponse.message}"`);
+        
+        // Add the AI-generated message to git args
+        const enhancedArgs = ['-m', aiResponse.message, ...gitArgs];
+        return enhancedArgs;
+      } else {
+        this.showInfo('💡 AI message generation failed, proceeding without message');
+        return gitArgs;
+      }
+
+    } catch (error) {
+      console.warn(`⚠️  AI commit message generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      this.showInfo('💡 Proceeding with commit without AI message');
+      return gitArgs;
+    }
   }
 
   getHelp(): string {
