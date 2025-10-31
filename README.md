@@ -391,7 +391,7 @@ edgit resync     # → Use: edgit init --force
 - **Git** 2.0+
 - Works with any Git repository
 
-*Note: npm package now includes built JavaScript files for proper global installation.*
+*Note: Global npm installation now works correctly with built JavaScript files.*
 
 ## Migration from Legacy Versions
 
