@@ -4,13 +4,19 @@
   "type": "module",
   "description": "",
   "main": "dist/index.js",
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
   "bin": {
     "edgit": "dist/index.js"
   },
   "scripts": {
     "test": "echo 'tests pass'",
     "build": "tsc",
-    "dev": "tsc && node"
+    "dev": "tsc && node",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "git",
