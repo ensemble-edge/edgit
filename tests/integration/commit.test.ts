@@ -7,7 +7,7 @@ describe('edgit commit', () => {
   beforeEach(async () => {
     repo = await TestGitRepo.create()
     await repo.init()
-    await repo.runEdgit(['init'])
+    // Note: No edgit init yet - tests will create files first
   })
 
   afterEach(async () => {
@@ -22,8 +22,8 @@ describe('edgit commit', () => {
     expect(result.exitCode).toBe(0)
 
     // Verify commit was created
-    const { stdout } = await repo.runEdgit(['..', 'git', 'log', '--oneline', '-1'])
-    expect(stdout).toContain('Add test prompt')
+    const log = await repo.getLog()
+    expect(log).toContain('Add test prompt')
   })
 
   it('should handle AI commit gracefully without API key', async () => {

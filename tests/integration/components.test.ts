@@ -7,7 +7,7 @@ describe('edgit components', () => {
   beforeEach(async () => {
     repo = await TestGitRepo.create()
     await repo.init()
-    await repo.runEdgit(['init'])
+    // Note: Each test will create components, then run init --force to rescan
   })
 
   afterEach(async () => {
@@ -17,6 +17,9 @@ describe('edgit components', () => {
   it('should detect prompt components', async () => {
     await repo.writeFile('prompts/helper.prompt.md', 'You are a helpful assistant')
     await repo.commit('Add prompt')
+
+    // Run init to detect components
+    await repo.runEdgit(['init'])
 
     const result = await repo.runEdgit(['components', 'list'])
 
@@ -28,6 +31,9 @@ describe('edgit components', () => {
     await repo.writeFile('agents/processor.agent.ts', '// Agent code\nexport {}')
     await repo.commit('Add agent')
 
+    // Run init to detect components
+    await repo.runEdgit(['init'])
+
     const result = await repo.runEdgit(['components', 'list'])
 
     expect(result.exitCode).toBe(0)
@@ -37,6 +43,9 @@ describe('edgit components', () => {
   it('should detect SQL components', async () => {
     await repo.writeFile('queries/users.sql', 'SELECT * FROM users;')
     await repo.commit('Add query')
+
+    // Run init to detect components
+    await repo.runEdgit(['init'])
 
     const result = await repo.runEdgit(['components', 'list'])
 
@@ -48,6 +57,9 @@ describe('edgit components', () => {
     await repo.writeFile('configs/app.config.json', '{"setting": "value"}')
     await repo.commit('Add config')
 
+    // Run init to detect components
+    await repo.runEdgit(['init'])
+
     const result = await repo.runEdgit(['components', 'list'])
 
     expect(result.exitCode).toBe(0)
@@ -57,6 +69,11 @@ describe('edgit components', () => {
   it('should show component details', async () => {
     await repo.writeFile('prompts/test.prompt.md', 'Test')
     await repo.commit('Add prompt')
+
+    // Run init to detect components
+    await repo.runEdgit(['init'])
+
+    // Create version tag
     await repo.runEdgit(['tag', 'create', 'test-prompt', 'v1.0.0'])
 
     const result = await repo.runEdgit(['components', 'show', 'test-prompt'])
