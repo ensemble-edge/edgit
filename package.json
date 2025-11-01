@@ -25,6 +25,9 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
     "validate": "npm run typecheck && npm run lint && npm run format:check && npm run build && npm test",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "changeset publish",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -35,6 +38,7 @@
   "author": "Ensemble Edge",
   "license": "ISC",
   "devDependencies": {
+    "@changesets/cli": "^2.29.7",
     "@types/node": "^24.9.2",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
