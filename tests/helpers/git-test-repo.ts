@@ -140,7 +140,7 @@ export class TestGitRepo {
   /**
    * Run edgit command in this repository
    */
-  async runEdgit(args: string[]): Promise<CommandResult> {
+  async runEdgit(args: string[], timeout?: number): Promise<CommandResult> {
     // Path to the built edgit CLI
     const edgitPath = join(__dirname, '../../dist/index.js')
 
@@ -156,7 +156,10 @@ export class TestGitRepo {
     const command = `node "${edgitPath}" ${escapedArgs.join(' ')}`
 
     try {
-      const { stdout, stderr } = await execAsync(command, { cwd: this.path })
+      const { stdout, stderr } = await execAsync(command, {
+        cwd: this.path,
+        timeout: timeout || 30000 // Default 30s timeout
+      })
       return { exitCode: 0, stdout, stderr }
     } catch (error: any) {
       return {
