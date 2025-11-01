@@ -2,356 +2,286 @@
 
 ## Overview
 
-This document defines the standards for maintaining and updating documentation across all Ensemble products. All documentation lives in the `ensemble-edge/docs` repository and follows a consistent structure for seamless navigation and maintenance.
+This document defines the standards for maintaining and updating documentation across all Ensemble products. All documentation lives in the `ensemble-edge/docs` repository and is built with **Mintlify**, a modern documentation platform.
+
+**Documentation Site**: [docs.ensemble.ai](https://docs.ensemble.ai) (coming soon)
+
+## Technology Stack
+
+- **Platform**: Mintlify ([mintlify.com](https://mintlify.com))
+- **Format**: MDX (Markdown + JSX components)
+- **Configuration**: `docs.json` for navigation and settings
+- **Deployment**: Cloudflare Pages
+- **Preview**: `mintlify dev` (via Mintlify CLI)
 
 ## Repository Structure
-````
+
+```
 ensemble-edge/docs/
-├── README.md                  # Documentation hub overview
-├── getting-started/           # Quick start guides for all products
-│   ├── index.md              # Overview and product selection
-│   ├── edgit.md              # Edgit quick start
-│   ├── conductor.md          # Conductor quick start
-│   └── ensemble.md           # Ensemble platform quick start
-├── edgit/                     # Edgit product documentation
-│   ├── README.md             # Edgit overview
-│   ├── installation.md       # Setup and installation
-│   ├── configuration.md      # Configuration options
-│   ├── api-reference/        # API documentation
-│   ├── guides/               # How-to guides
-│   ├── examples/             # Code examples
-│   └── troubleshooting.md    # Common issues and solutions
-├── conductor/                 # Conductor orchestration platform
-│   ├── README.md             # Conductor overview
-│   ├── architecture.md       # System architecture
-│   ├── agents/               # Agent documentation
-│   ├── workflows/            # Workflow patterns
-│   ├── api-reference/        # API documentation
-│   └── deployment.md         # Deployment guides
-├── shared/                    # Shared components and utilities
-│   ├── authentication.md     # Common auth patterns
-│   ├── error-handling.md     # Standard error codes
-│   ├── data-models.md        # Shared data structures
-│   └── best-practices.md     # Cross-product best practices
-├── api/                       # Unified API documentation
-│   ├── rest/                 # REST API specs
-│   ├── graphql/              # GraphQL schemas
-│   └── webhooks/             # Webhook documentation
-└── archive/                   # Deprecated documentation
-````
+├── docs.json                  # Mintlify configuration & navigation
+├── index.mdx                  # Landing page
+├── getting-started/           # Quick start guides
+│   ├── index.mdx
+│   ├── edgit.mdx
+│   └── conductor.mdx
+├── edgit/                     # Edgit documentation
+│   ├── overview.mdx
+│   ├── installation.mdx
+│   ├── configuration.mdx
+│   ├── api-reference/
+│   ├── guides/
+│   └── examples/
+├── conductor/                 # Conductor documentation
+│   ├── overview.mdx
+│   ├── architecture.mdx
+│   ├── agents/
+│   ├── workflows/
+│   └── deployment/
+├── shared/                    # Cross-product patterns
+├── api/                       # API documentation
+└── ai-tools/                  # AI tooling integration
+```
 
 ## Documentation Standards
 
-### 1. File Naming Convention
-````
-- Use lowercase with hyphens: `api-reference.md`, not `APIReference.md`
-- Be descriptive: `error-handling.md`, not `errors.md`
-- Use index.md for category landing pages
-- Version-specific docs: `migration-v2-to-v3.md`
-````
+### 1. File Naming
 
-### 2. Document Structure Template
+- Use lowercase with hyphens: `api-reference.mdx`
+- Always use `.mdx` extension (required by Mintlify)
+- Use `index.mdx` for category landing pages
+- Be descriptive: `error-handling.mdx`, not `errors.mdx`
 
-Every documentation file must follow this structure:
-````markdown
-# [Feature/Component Name]
+### 2. Document Structure
 
-> **Product**: [Edgit | Conductor | Ensemble]  
-> **Version**: v[X.Y.Z]  
-> **Last Updated**: YYYY-MM-DD
+Every MDX file must have YAML frontmatter and follow this structure:
+
+```mdx
+---
+title: "Feature Name"
+description: "Brief one-line description for SEO"
+---
+
+> **Product**: Edgit | Conductor | Ensemble
+> **Version**: v1.0.0
+> **Last Updated**: 2025-11-01
 
 ## Overview
-[Brief description of what this document covers]
+[Brief description]
 
 ## Prerequisites
 - Required knowledge
-- Required tools/access
-- Related documentation links
+- Required tools
 
-## [Main Content Sections]
+## Main Content
 
 ## Examples
-[Practical, runnable examples]
-
-## API Reference (if applicable)
-[Link to detailed API docs]
-
-## Common Issues
-[Known issues and solutions]
 
 ## Related Documentation
-- [Related Topic 1](link)
-- [Related Topic 2](link)
+<CardGroup cols={2}>
+  <Card title="Topic 1" href="/path" icon="icon-name">
+    Description
+  </Card>
+</CardGroup>
+```
 
-## Changelog
-- YYYY-MM-DD: [Description of change]
-````
+### 3. Code Examples
 
-### 3. Code Examples Standards
-````typescript
-// ✅ ALWAYS: Complete, runnable examples with context
-import { Conductor } from '@ensemble/conductor';
+Use Mintlify code blocks with filename attribute:
 
-/**
- * Example: Setting up a basic Conductor workflow
- * This example demonstrates error handling and retry logic
- */
-async function setupWorkflow() {
-  const conductor = new Conductor({
-    apiKey: process.env.CONDUCTOR_API_KEY,
-    environment: 'production',
-  });
+```mdx
+\`\`\`typescript filename="example.ts"
+import { Edgit } from '@ensemble/edgit';
 
-  const workflow = conductor.createWorkflow({
-    name: 'data-processing',
-    retryPolicy: {
-      maxAttempts: 3,
-      backoffMultiplier: 2,
-    },
-  });
+const edgit = new Edgit();
+\`\`\`
+```
 
-  // ... complete example
+For multiple languages, use CodeGroup:
+
+```mdx
+<CodeGroup>
+  \`\`\`bash npm
+  npm install @ensemble/edgit
+  \`\`\`
+  \`\`\`bash yarn
+  yarn add @ensemble/edgit
+  \`\`\`
+</CodeGroup>
+```
+
+### 4. Mintlify Components
+
+**Callouts**:
+```mdx
+<Info>General information (blue)</Info>
+<Warning>Important warnings (yellow)</Warning>
+<Tip>Helpful tips (green)</Tip>
+<Note>Additional context (gray)</Note>
+```
+
+**Cards**:
+```mdx
+<CardGroup cols={2}>
+  <Card title="Title" icon="rocket" href="/path">
+    Description
+  </Card>
+</CardGroup>
+```
+
+**Accordions**:
+```mdx
+<AccordionGroup>
+  <Accordion title="Question">
+    Answer
+  </Accordion>
+</AccordionGroup>
+```
+
+**Steps**:
+```mdx
+<Steps>
+  <Step title="First">
+    Content
+  </Step>
+  <Step title="Second">
+    Content
+  </Step>
+</Steps>
+```
+
+**Tabs**:
+```mdx
+<Tabs>
+  <Tab title="Option 1">
+    Content
+  </Tab>
+  <Tab title="Option 2">
+    Content
+  </Tab>
+</Tabs>
+```
+
+**API Parameters**:
+```mdx
+<ParamField path="apiKey" type="string" required>
+  Your API key
+</ParamField>
+
+<ResponseField name="status" type="string">
+  Response status
+</ResponseField>
+```
+
+### 5. Navigation Configuration
+
+Update `docs.json` for all new pages:
+
+```json
+{
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Tab Name",
+        "groups": [
+          {
+            "group": "Group Name",
+            "pages": [
+              "path/to/page"
+            ]
+          }
+        ]
+      }
+    ]
+  }
 }
+```
 
-// ❌ NEVER: Incomplete snippets without context
-conductor.run() // What is conductor? How was it initialized?
-````
+## Update Workflow
 
-### 4. Cross-References
-
-When referencing other products or shared components:
-````markdown
-## Integration with Conductor
-
-Edgit seamlessly integrates with [Conductor](/conductor/README.md) for orchestration.
-
-### Authentication
-Uses shared authentication model. See [Authentication Guide](/shared/authentication.md).
-
-### Data Models
-Implements standard Ensemble data models. See [Data Models Reference](/shared/data-models.md).
-````
-
-### 5. Version Documentation
-````markdown
-## Version Compatibility
-
-| Edgit Version | Conductor Version | Ensemble Platform |
-|---------------|-------------------|-------------------|
-| 2.x           | 3.x               | 1.5+              |
-| 1.x           | 2.x               | 1.0+              |
-
-For migration guides, see [Migration Documentation](/edgit/migrations/).
-````
-
-## Update Process
-
-### 1. Documentation Update Workflow
-````bash
-# 1. Clone the docs repository
+```bash
+# 1. Clone repository
 git clone git@github.com:ensemble-edge/docs.git
 cd docs
 
-# 2. Create feature branch
-git checkout -b docs/[product]-[feature]
-# Examples: docs/edgit-api-update, docs/conductor-agents
+# 2. Install Mintlify CLI
+npm install -g mintlify
 
-# 3. Make changes following standards
+# 3. Create feature branch
+git checkout -b docs/product-feature
 
-# 4. Run documentation validation
-npm run validate-docs
+# 4. Make changes (use .mdx extension!)
 
-# 5. Preview changes locally
-npm run preview
+# 5. Preview locally
+mintlify dev
+# Opens http://localhost:3000
 
-# 6. Commit with conventional commits
-git commit -m "docs(edgit): add error handling guide"
-git commit -m "docs(conductor): update agent configuration"
+# 6. Validate links
+mintlify broken-links
 
-# 7. Push and create PR
-git push origin docs/[product]-[feature]
-````
+# 7. Commit and push
+git commit -m "docs(product): description"
+git push origin docs/product-feature
+```
 
-### 2. Automated Sync from Product Repos
+## Deployment
 
-Each product repository should have a `docs/` folder that syncs to the main documentation:
-````yaml
-# .github/workflows/sync-docs.yml in product repos
-name: Sync Documentation
-on:
-  push:
-    paths:
-      - 'docs/**'
-    branches:
-      - main
+Documentation is automatically deployed via Cloudflare Pages:
 
-jobs:
-  sync:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Sync to ensemble-edge/docs
-        run: |
-          # Copy product-specific docs to main repo
-          cp -r docs/* ../ensemble-edge/docs/${{ env.PRODUCT_NAME }}/
-          
-      - name: Create PR
-        uses: peter-evans/create-pull-request@v5
-        with:
-          title: "docs(${{ env.PRODUCT_NAME }}): sync from product repo"
-          branch: auto-sync/${{ env.PRODUCT_NAME }}
-````
+1. Push to `main` branch triggers deployment
+2. Cloudflare Pages builds with Mintlify
+3. Deploys to docs.ensemble.ai
+4. Preview URLs for pull requests
 
-### 3. Documentation Review Checklist
+## Review Checklist
 
-Before merging documentation updates:
+Before merging:
 
-- [ ] **Accuracy**: Technical details are correct
-- [ ] **Completeness**: All necessary information included
-- [ ] **Examples**: Working code examples provided
-- [ ] **Cross-references**: Links to related docs work
-- [ ] **Consistency**: Follows documentation standards
-- [ ] **Clarity**: Clear for target audience
-- [ ] **Versioning**: Version compatibility noted
-- [ ] **Navigation**: Fits logical information architecture
+- [ ] YAML frontmatter with title and description
+- [ ] All links work (tested with `mintlify broken-links`)
+- [ ] Code examples are complete and runnable
+- [ ] Mintlify components used appropriately
+- [ ] Added to `docs.json` navigation if new page
+- [ ] Previewed with `mintlify dev`
+- [ ] Follows tone and style guidelines
 
 ## Writing Guidelines
-
-### Tone and Voice
 
 - **Professional but approachable**: Write as a knowledgeable colleague
 - **Action-oriented**: Use imperative mood for instructions
 - **Concise**: Get to the point quickly
-- **Inclusive**: Avoid jargon without explanation
+- **Scannable**: Use headers, lists, and emphasis
 
-### Examples
-````markdown
-✅ GOOD: "Configure the API endpoint by setting the `ENSEMBLE_API_URL` environment variable."
-❌ BAD: "You might want to think about possibly configuring the endpoint."
+**Good vs Bad**:
+```
+✅ GOOD: "Configure the API endpoint by setting ENSEMBLE_API_URL."
+❌ BAD: "You might want to think about possibly configuring..."
 
-✅ GOOD: "This error occurs when the rate limit is exceeded. Wait 60 seconds before retrying."
-❌ BAD: "Sometimes things don't work because of reasons related to doing things too much."
-````
+✅ GOOD: "This error occurs when rate limit is exceeded. Wait 60 seconds."
+❌ BAD: "Sometimes things don't work because of reasons..."
+```
 
-### Technical Writing Principles
+## Mintlify CLI Commands
 
-1. **Start with why**: Explain the purpose before the how
-2. **Show, don't just tell**: Include examples
-3. **Progressive disclosure**: Basic info first, advanced later
-4. **Scannable content**: Use headers, lists, and emphasis
-5. **Searchable**: Use keywords naturally
-
-## Product-Specific Sections
-
-### Edgit Documentation
-
-Focus areas:
-- Component registry management
-- Git integration workflows
-- CLI command reference
-- Configuration schemas
-- Migration guides
-
-### Conductor Documentation
-
-Focus areas:
-- Agent architecture
-- Workflow orchestration
-- Event-driven patterns
-- Performance tuning
-- Deployment strategies
-
-### Future Products
-
-When adding new products:
-
-1. Create new top-level directory
-2. Follow same structure as existing products
-3. Update main README.md with product entry
-4. Add to getting-started index
-5. Update navigation configuration
-6. Set up automated sync workflow
-
-## Maintenance Schedule
-
-- **Weekly**: Review and merge documentation PRs
-- **Monthly**: Audit for broken links and outdated content
-- **Quarterly**: Major documentation reorganization if needed
-- **Per Release**: Update version-specific documentation
-
-## Documentation Tools
-
-### Required Tools
-````bash
-# Install documentation tools
-npm install -g @ensemble/doc-tools
-
-# Validate documentation structure
-doc-tools validate
+```bash
+# Start local preview
+mintlify dev
 
 # Check for broken links
-doc-tools check-links
+mintlify broken-links
 
-# Generate API documentation from code
-doc-tools generate-api
+# Install Mintlify in project
+mintlify install
 
-# Preview documentation site
-doc-tools preview
-````
-
-### Markdown Extensions
-
-We support these markdown extensions:
-
-- **Mermaid diagrams**: For architecture diagrams
-- **Code tabs**: For multiple language examples
-- **Admonitions**: For notes, warnings, tips
-- **Include files**: For shared content chunks
-````markdown
-:::note
-This is an informational note.
-:::
-
-:::warning
-This is a warning message.
-:::
-
-:::tip
-This is a helpful tip.
-:::
-```mermaid
-graph TD
-    A[Edgit] -->|orchestrates| B[Conductor]
-    B -->|manages| C[Agents]
+# Update Mintlify
+npm update mintlify
 ```
-````
-
-## Quality Standards
-
-### Documentation is Code
-
-- Documentation goes through same review process as code
-- Documentation bugs are real bugs
-- Documentation debt is technical debt
-- Documentation tests prevent regression
-
-### Metrics
-
-Track these metrics monthly:
-
-- Documentation coverage (% of features documented)
-- Time to first successful API call (from docs)
-- Documentation-related support tickets
-- Documentation contribution rate
 
 ## Getting Help
 
-- **Slack**: #ensemble-docs channel
-- **GitHub Issues**: Label with `documentation`
-- **Office Hours**: Weekly documentation review sessions
-- **Templates**: Available in `/templates` directory
+- **GitHub Issues**: [ensemble-edge/edgit/issues](https://github.com/ensemble-edge/edgit/issues) (label: `documentation`)
+- **Mintlify Docs**: [mintlify.com/docs](https://mintlify.com/docs)
+- **GitHub Discussions**: [ensemble-edge/edgit/discussions](https://github.com/ensemble-edge/edgit/discussions)
 
 ---
 
-**Remember**: Great documentation is as important as great code. It's the interface between your brilliant engineering and the developers who will build on it.
+**Remember**: Great documentation is as important as great code.

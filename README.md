@@ -701,4 +701,9 @@ This project is in beta and follows semantic versioning with pre-1.0 conventions
 
 ## License
 
-MIT
+
+MIT - see [LICENSE](LICENSE) file for details.
+
+## Trademark
+
+Ensemble® is a registered trademark of Higinio O. Maycotte.
