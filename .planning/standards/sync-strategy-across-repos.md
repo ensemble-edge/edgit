@@ -167,6 +167,7 @@ Docs and examples repos receive essential files only:
 - COPYRIGHT
 - SUPPORT.md (tailored to docs/examples context)
 - CONTRIBUTING.md (simplified for docs/examples contributions)
+- CLAUDE.md (lightweight version with commit standards)
 - .editorconfig (for consistent editing)
 
 ### 1. Master Repository
@@ -249,8 +250,13 @@ When synchronizing repositories from edgit:
 - Customize TESTING.md (change test scenarios for conductor)
 - Keep structure and standards identical, change content specifics
 
-# Docs/examples: Not applicable
-- These repos don't need dev docs
+# Simplified sync to docs/examples:
+- Create lightweight CLAUDE.md with:
+  * Repository purpose and structure
+  * Git commit standards (NO AI attribution)
+  * Basic contribution guidance
+  * Links to relevant resources
+- NO DEVELOPMENT.md or TESTING.md needed (not development repos)
 ```
 
 #### Step 4: Sync Development Configs
