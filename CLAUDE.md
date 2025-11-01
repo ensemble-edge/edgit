@@ -97,6 +97,40 @@ All commits must follow Conventional Commits format WITHOUT any AI attribution:
 - `refactor`: Code refactoring
 - `test`: Test additions or changes
 - `chore`: Maintenance tasks
+- `build`: Build system or compiled output changes
+
+## Build Artifacts and dist/
+
+**IMPORTANT**: The `dist/` directory **must be committed** to the repository.
+
+### Why commit dist/?
+- NPM package consumers get pre-built files (no build step required)
+- Enables `npx @ensemble-edge/edgit` to work immediately
+- CI builds are for verification only; the published package uses committed dist/
+
+### Workflow when changing source code:
+1. Make changes to `src/` files
+2. Run `npm run build` to compile TypeScript → JavaScript
+3. Commit both `src/` changes AND `dist/` changes together:
+   ```bash
+   git add src/ dist/
+   git commit -m "feat: add new feature"
+   ```
+
+### When to commit dist/:
+- ✅ After making changes to source code in `src/`
+- ✅ After adding new tests that pass
+- ✅ As part of feature/fix commits
+- ❌ Don't skip committing dist/ - the package won't work without it
+
+### Build commit pattern:
+If dist/ changes are from a previous commit's source changes, create a separate build commit:
+```bash
+git add dist/
+git commit -m "build: update compiled dist files
+
+Include dist/ build artifacts from previous source changes"
+```
 
 ## Architecture Overview
 
