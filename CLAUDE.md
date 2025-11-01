@@ -46,6 +46,45 @@ git tag -l         # List all tags (edgit creates tags under components/*)
 git log --oneline  # View commit history
 ```
 
+## Git Commit Standards
+
+### Commit Message Format
+All commits must follow Conventional Commits format WITHOUT any AI attribution:
+
+- **NEVER** append "code written by claude" or similar attribution to commit messages
+- **NEVER** add signatures, author notes, or "written by" suffixes
+- Use clean, professional commit messages focusing only on the changes
+
+### Correct Format:
+```
+<type>(<scope>): <subject>
+
+[optional body]
+
+[optional footer]
+```
+
+### Examples:
+✅ CORRECT:
+- `feat: add error handling to API endpoints`
+- `fix: resolve memory leak in component registry`
+- `docs: update development guide`
+- `refactor: extract shared utilities`
+
+❌ INCORRECT:
+- `feat: add API endpoints - code written by claude`
+- `fix: bug fix (written by Claude)`
+- Any commit with attribution or signatures
+
+### Commit Types:
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting, etc.)
+- `refactor`: Code refactoring
+- `test`: Test additions or changes
+- `chore`: Maintenance tasks
+
 ## Architecture Overview
 
 **Edgit** is a Git tag-based component versioning system for AI workflows. It treats Git tags as "portals" to different component versions, eliminating merge conflicts while enabling independent component versioning.
@@ -226,6 +265,14 @@ const tagManager = new GitTagManager();
 await tagManager.createVersionTag('my-component', 'v1.0.0');
 await tagManager.createDeploymentTag('my-component', 'prod', 'v1.0.0');
 ```
+
+### Version Control
+
+- Follow Conventional Commits strictly
+- Keep commits atomic and focused
+- Write commit messages in imperative mood
+- No AI attribution in any git operations
+- See [Git Commit Standards](#git-commit-standards) section for detailed requirements
 
 ### Component Detection
 
