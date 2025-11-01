@@ -224,11 +224,19 @@ When synchronizing repositories from edgit:
 # Full sync to conductor:
 - Copy CODE_OF_CONDUCT.md as-is
 - Copy SECURITY.md as-is
-- Customize CONTRIBUTING.md for conductor specifics
-- Customize SUPPORT.md (change edgit URLs to conductor URLs)
+- Customize CONTRIBUTING.md for conductor specifics:
+  * Update changeset prompt: "press Enter for conductor" (not edgit)
+  * Keep conventional commit examples but adjust scope names
+- Customize SUPPORT.md thoroughly:
+  * Change "Edgit" → "Conductor" in all text
+  * Update docs links: /edgit → /conductor
+  * Update GitHub links: edgit repo → conductor repo
+  * Update "Contributing to Edgit" → "Contributing to Conductor"
 
 # Simplified sync to docs/examples:
-- Copy SUPPORT.md and customize for docs/examples context
+- Copy SUPPORT.md and customize for docs/examples context:
+  * Change GitHub Discussions to org-level (not product-specific)
+  * Keep links to both edgit and conductor docs (examples covers both)
 - Create simplified CONTRIBUTING.md for docs/examples contributions
 - CODE_OF_CONDUCT.md and SECURITY.md optional (can reference main repo)
 ```
@@ -308,6 +316,49 @@ For edgit and conductor:
 - Include copyright header in CLI entry files
 - Display trademark notice in CLI help text
 - Maintain backward compatibility in CLI commands
+
+### 7. Commit Message Standards
+
+**IMPORTANT**: Follow conventional commits WITHOUT AI attribution:
+- ✅ Correct: `fix: update domain references`
+- ✅ Correct: `feat(conductor): add workflow execution`
+- ❌ Wrong: Adding "🤖 Generated with Claude Code" or "Co-Authored-By: Claude"
+- ❌ Wrong: Any AI attribution in commit messages
+
+The CLAUDE.md in each repo explicitly forbids AI attribution in commits. This applies to:
+- All sync commits
+- All fix commits
+- All feature commits
+
+Reference: See "Git Commit Standards" section in any CLAUDE.md file.
+
+## Common Pitfalls and How to Avoid Them
+
+### Pitfall 1: Incomplete SUPPORT.md Customization
+**Issue**: Only changing email domains but leaving product names and GitHub links
+**Solution**: Use the detailed checklist in Step 2 - change ALL references:
+- Product names (Edgit → Conductor)
+- GitHub org/repo links
+- Documentation paths
+- Contributing text
+
+### Pitfall 2: Hidden Product References
+**Issue**: Missing edgit references in unexpected places (changeset prompts, example text)
+**Solution**: After sync, search entire repo:
+```bash
+grep -ri "edgit" --include="*.md" . | grep -v node_modules
+```
+
+### Pitfall 3: AI Attribution in Commits
+**Issue**: Adding Claude/AI attribution despite CLAUDE.md forbidding it
+**Solution**: Always use plain conventional commits with NO attribution footer
+
+### Pitfall 4: Wrong GitHub Discussions Links
+**Issue**: Using product-specific discussions link in multi-product contexts
+**Solution**:
+- Edgit repo → edgit/discussions
+- Conductor repo → conductor/discussions
+- Docs/Examples repos → org-level /orgs/ensemble-edge/discussions
 
 ## Maintenance Cadence
 
