@@ -6,12 +6,25 @@ This file provides guidance to Claude Code (claude.ai/code) and other AI assista
 
 **When creating planning documents, phase summaries, TODO lists, or any working notes, ALWAYS place them in the `.planning/` directory.**
 
-The `.planning/` directory is gitignored and used for:
-- Phase summaries (PHASE0_SUMMARY.md, PHASE1_SUMMARY.md, etc.)
-- Implementation plans and roadmaps
-- Refactoring plans and analysis
-- Performance reports
-- Local TODO lists and notes
+The `.planning/` directory is organized into three areas:
+
+### `.planning/strategy/` - Strategic Planning
+Long-term planning and project direction:
+- Phase summaries: `PHASE0_SUMMARY.md`, `PHASE1_SUMMARY.md`, etc.
+- Project checkpoints: `CHECKPOINT.md`
+- Roadmaps and vision documents
+
+### `.planning/todos/` - Task Management
+Day-to-day tactical tasks:
+- Current work items: `current-tasks.md`
+- Backlog: `backlog.md`
+- Bug tracking and quick action items
+
+### `.planning/standards/` - Reference Materials
+Reusable guidelines and checklists:
+- Code review standards
+- Architecture decision records (ADRs)
+- Development guidelines
 
 **Do NOT create these files in the project root or src/ directory.**
 
