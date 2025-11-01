@@ -52,7 +52,7 @@ function parseArgs(argv) {
         subcommand,
         args: commandArgs,
         options,
-        workspace
+        workspace,
     };
 }
 /**
@@ -64,7 +64,7 @@ function isSubcommand(command, arg) {
         tag: ['create', 'list', 'show', 'delete', 'push'],
         deploy: ['set', 'promote', 'status', 'list', 'rollback'],
         discover: ['scan', 'detect', 'patterns'],
-        patterns: ['list', 'add', 'remove', 'show']
+        patterns: ['list', 'add', 'remove', 'show'],
     };
     return subcommands[command]?.includes(arg) || false;
 }
@@ -339,10 +339,10 @@ const currentFileUrl = import.meta.url;
 const currentFilePath = new URL(currentFileUrl).pathname;
 const calledScript = process.argv[1];
 // Check if this script is being executed directly or via npm bin
-const isDirectExecution = calledScript && (currentFilePath === calledScript || // Direct execution
-    currentFileUrl === `file://${calledScript}` || // Direct with file:// protocol  
-    calledScript.includes('edgit') // npm bin symlink
-);
+const isDirectExecution = calledScript &&
+    (currentFilePath === calledScript || // Direct execution
+        currentFileUrl === `file://${calledScript}` || // Direct with file:// protocol
+        calledScript.includes('edgit')); // npm bin symlink
 if (isDirectExecution) {
     main().catch((error) => {
         console.error('❌', error.message || error);

@@ -90,8 +90,11 @@ export class DeployCommand extends Command {
     async promoteComponent(args) {
         const fromIndex = args.indexOf('--from');
         const toIndex = args.indexOf('--to');
-        if (args.length < 5 || fromIndex === -1 || toIndex === -1 ||
-            fromIndex === args.length - 1 || toIndex === args.length - 1) {
+        if (args.length < 5 ||
+            fromIndex === -1 ||
+            toIndex === -1 ||
+            fromIndex === args.length - 1 ||
+            toIndex === args.length - 1) {
             console.error('Usage: edgit deploy promote <component> --from <source-env> --to <target-env>');
             process.exit(1);
         }
@@ -215,7 +218,7 @@ export class DeployCommand extends Command {
                 // Find previous version (simplified - get second-to-last version tag)
                 const versionTags = await this.tagManager.getVersionTags(componentName);
                 if (versionTags.length < 2) {
-                    console.error(`❌ No previous version found for rollback`);
+                    console.error('❌ No previous version found for rollback');
                     process.exit(1);
                 }
                 rollbackVersion = versionTags[versionTags.length - 2]; // Second-to-last (guaranteed to exist)
@@ -266,10 +269,10 @@ export class DeployCommand extends Command {
             console.log(`📦 ${componentName} (${component.type})`);
             console.log(`   Path: ${component.path}`);
             if (deploymentTags.length === 0) {
-                console.log(`   No deployments`);
+                console.log('   No deployments');
                 return;
             }
-            console.log(`   Deployments:`);
+            console.log('   Deployments:');
             for (const env of deploymentTags) {
                 await this.showEnvironmentStatus(componentName, env, '     ');
             }
@@ -375,7 +378,7 @@ export class DeployCommand extends Command {
         for (const componentName of componentNames) {
             try {
                 const deploymentTags = await this.tagManager.getDeploymentTags(componentName);
-                deploymentTags.forEach(env => environments.add(env));
+                deploymentTags.forEach((env) => environments.add(env));
             }
             catch {
                 // Continue

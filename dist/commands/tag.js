@@ -223,7 +223,7 @@ export class TagCommand extends Command {
             await this.tagManager.deleteTag(componentName, tagName, deleteRemote);
             console.log(`✅ Deleted tag: ${componentName}@${tagName}`);
             if (deleteRemote) {
-                console.log(`   Also deleted from remote`);
+                console.log('   Also deleted from remote');
             }
         }
         catch (error) {
@@ -237,7 +237,7 @@ export class TagCommand extends Command {
      */
     async pushTags(args) {
         const force = args.includes('--force');
-        const componentName = args.find(arg => arg !== '--force');
+        const componentName = args.find((arg) => arg !== '--force');
         if (componentName) {
             // Push tags for specific component
             const registry = await this.loadRegistry();
@@ -323,12 +323,12 @@ export class TagCommand extends Command {
             if (deploymentTags.length > 0) {
                 console.log(`   Deployments: ${deploymentTags.join(', ')}`);
             }
-            const customTags = allTags.filter(tag => !this.isVersionTag(tag) && !this.isDeploymentTag(tag));
+            const customTags = allTags.filter((tag) => !this.isVersionTag(tag) && !this.isDeploymentTag(tag));
             if (customTags.length > 0) {
                 console.log(`   Custom: ${customTags.join(', ')}`);
             }
             if (allTags.length === 0) {
-                console.log(`   No tags`);
+                console.log('   No tags');
             }
         }
         catch (error) {

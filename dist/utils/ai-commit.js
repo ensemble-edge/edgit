@@ -28,7 +28,7 @@ class OpenAIProvider {
                 .replace('${diff}', this.truncateDiff(comp.diff, 1500));
         }
         const componentSummary = components
-            .map(c => {
+            .map((c) => {
             const action = c.oldVersion === '0.0.0' || !c.oldVersion ? 'new' : 'modified';
             return `• ${c.name} (${c.type}) - ${action}`;
         })
@@ -46,11 +46,16 @@ class OpenAIProvider {
     }
     getComponentTemplate(type) {
         switch (type) {
-            case 'prompt': return PROMPT_TEMPLATES.componentPrompt;
-            case 'agent': return PROMPT_TEMPLATES.componentAgent;
-            case 'sql': return PROMPT_TEMPLATES.componentSQL;
-            case 'config': return PROMPT_TEMPLATES.componentConfig;
-            default: return PROMPT_TEMPLATES.componentPrompt;
+            case 'prompt':
+                return PROMPT_TEMPLATES.componentPrompt;
+            case 'agent':
+                return PROMPT_TEMPLATES.componentAgent;
+            case 'sql':
+                return PROMPT_TEMPLATES.componentSQL;
+            case 'config':
+                return PROMPT_TEMPLATES.componentConfig;
+            default:
+                return PROMPT_TEMPLATES.componentPrompt;
         }
     }
     truncateDiff(diff, maxLength) {
@@ -58,7 +63,7 @@ class OpenAIProvider {
             return diff;
         // Smart truncation: keep headers and important changes
         const lines = diff.split('\n');
-        const important = lines.filter(line => line.startsWith('+++') ||
+        const important = lines.filter((line) => line.startsWith('+++') ||
             line.startsWith('---') ||
             line.startsWith('@@') ||
             line.includes('TODO') ||
@@ -75,7 +80,7 @@ class OpenAIProvider {
             const response = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${this.apiKey}`,
+                    Authorization: `Bearer ${this.apiKey}`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
@@ -83,12 +88,12 @@ class OpenAIProvider {
                     messages: [
                         {
                             role: 'system',
-                            content: 'You are an expert at writing clear, concise Git commit messages. Follow conventional commit format when appropriate.'
+                            content: 'You are an expert at writing clear, concise Git commit messages. Follow conventional commit format when appropriate.',
                         },
                         {
                             role: 'user',
-                            content: prompt
-                        }
+                            content: prompt,
+                        },
                     ],
                     max_tokens: 100,
                     temperature: 0.3,
@@ -149,7 +154,7 @@ export class AICommitManager {
             return {
                 success: false,
                 error: error.message,
-                fallback: true
+                fallback: true,
             };
         }
     }
@@ -158,7 +163,7 @@ export class AICommitManager {
             return {
                 success: false,
                 message: `Updated ${component.name} to v${component.newVersion}`,
-                fallback: true
+                fallback: true,
             };
         }
         try {
@@ -170,7 +175,7 @@ export class AICommitManager {
             return {
                 success: false,
                 message: `Updated ${component.name} to v${component.newVersion}`,
-                fallback: true
+                fallback: true,
             };
         }
     }
@@ -247,7 +252,7 @@ Focus on:
 - Feature toggles
 - Performance tuning
 
-One clear sentence describing the change, no prefix.`
+One clear sentence describing the change, no prefix.`,
 };
 /**
  * Default AI configuration
@@ -259,6 +264,6 @@ export const DEFAULT_AI_CONFIG = {
     maxDiffSize: 10000,
     timeout: 10000,
     generateComponentMessages: true,
-    includeVersionsInCommit: false
+    includeVersionsInCommit: false,
 };
 //# sourceMappingURL=ai-commit.js.map

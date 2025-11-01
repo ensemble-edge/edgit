@@ -46,7 +46,7 @@ export class ComponentNameGenerator {
         const collision = this.checkCollision(candidateName, existingComponents);
         const result = {
             name: candidateName,
-            wasNormalized: endsWithType
+            wasNormalized: endsWithType,
         };
         if (warning) {
             result.warning = warning;
@@ -83,18 +83,18 @@ export class ComponentNameGenerator {
         }
         return {
             detected: true,
-            suggestions: suggestions.slice(0, 3) // Return top 3 suggestions
+            suggestions: suggestions.slice(0, 3), // Return top 3 suggestions
         };
     }
     /**
      * Clean and normalize base name for component naming
      */
     static cleanBaseName(baseName) {
-        return baseName
+        return (baseName
             .replace(/[^a-zA-Z0-9-_]/g, '-') // Replace invalid chars with hyphens
             .replace(/-+/g, '-') // Collapse multiple hyphens
             .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
-            .toLowerCase() || 'component'; // Fallback if empty
+            .toLowerCase() || 'component'); // Fallback if empty
     }
     /**
      * Validate worker name meets Cloudflare Edge Worker requirements
@@ -127,7 +127,7 @@ export class ComponentNameGenerator {
         }
         return {
             valid: errors.length === 0,
-            errors
+            errors,
         };
     }
 }

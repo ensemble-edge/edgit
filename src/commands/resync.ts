@@ -1,4 +1,4 @@
-import { Command } from './base.js';
+import { Command } from './base.js'
 
 /**
  * Simplified resync command stub for Git tag-based versioning
@@ -7,18 +7,18 @@ import { Command } from './base.js';
 export class ResyncCommand extends Command {
   async execute(args: string[]): Promise<void> {
     if (this.shouldShowHelp(args)) {
-      console.log(this.getHelp());
-      return;
+      console.log(this.getHelp())
+      return
     }
 
-    console.log('⚠️  The resync command is deprecated in the Git tag-based version of edgit.');
-    console.log('');
-    console.log('🔄 To synchronize your component registry:');
-    console.log('   1. Use "edgit init --force" to reinitialize and scan components');
-    console.log('   2. Use "edgit components" to view the current registry');
-    console.log('   3. Use "edgit tag" commands for version management');
-    console.log('');
-    console.log('💡 All versioning is now handled by Git tags automatically.');
+    console.log('⚠️  The resync command is deprecated in the Git tag-based version of edgit.')
+    console.log('')
+    console.log('🔄 To synchronize your component registry:')
+    console.log('   1. Use "edgit init --force" to reinitialize and scan components')
+    console.log('   2. Use "edgit components" to view the current registry')
+    console.log('   3. Use "edgit tag" commands for version management')
+    console.log('')
+    console.log('💡 All versioning is now handled by Git tags automatically.')
   }
 
   getHelp(): string {
@@ -38,6 +38,6 @@ ALTERNATIVES:
 MIGRATION:
    The complex version history reconstruction is no longer needed
    since Git tags serve as the authoritative version source.
-`;
+`
   }
 }

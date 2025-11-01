@@ -1,49 +1,51 @@
-import { Command } from './base.js';
-import { GitWrapper } from '../utils/git.js';
-import { GitTagManager, createGitTagManager } from '../utils/git-tags.js';
-import { ComponentRegistry, ComponentUtils } from '../models/components.js';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import { Command } from './base.js'
+import { GitWrapper } from '../utils/git.js'
+import type { GitTagManager } from '../utils/git-tags.js'
+import { createGitTagManager } from '../utils/git-tags.js'
+import type { ComponentRegistry } from '../models/components.js'
+import { ComponentUtils } from '../models/components.js'
+import * as fs from 'fs/promises'
+import * as path from 'path'
 
 /**
  * Deploy command for managing component deployments using Git tags
  * Moves deployment tags between environments and promotes components
  */
 export class DeployCommand extends Command {
-  private tagManager: GitTagManager;
+  private tagManager: GitTagManager
 
   constructor() {
-    super();
-    this.tagManager = createGitTagManager(this.git);
+    super()
+    this.tagManager = createGitTagManager(this.git)
   }
 
   async execute(args: string[]): Promise<void> {
     if (args.length === 0) {
-      await this.showHelp();
-      return;
+      await this.showHelp()
+      return
     }
 
-    const subcommand = args[0];
+    const subcommand = args[0]
 
     switch (subcommand) {
       case 'set':
-        await this.deployComponent(args.slice(1));
-        break;
+        await this.deployComponent(args.slice(1))
+        break
       case 'promote':
-        await this.promoteComponent(args.slice(1));
-        break;
+        await this.promoteComponent(args.slice(1))
+        break
       case 'status':
-        await this.showDeploymentStatus(args.slice(1));
-        break;
+        await this.showDeploymentStatus(args.slice(1))
+        break
       case 'list':
-        await this.listDeployments(args.slice(1));
-        break;
+        await this.listDeployments(args.slice(1))
+        break
       case 'rollback':
-        await this.rollbackDeployment(args.slice(1));
-        break;
+        await this.rollbackDeployment(args.slice(1))
+        break
       default:
         // Default behavior: deploy component
-        await this.deployComponent(args);
+        await this.deployComponent(args)
     }
   }
 
@@ -53,56 +55,55 @@ export class DeployCommand extends Command {
    *        edgit deploy <component> <version> --to <env>
    */
   async deployComponent(args: string[]): Promise<void> {
-    const toIndex = args.indexOf('--to');
-    
+    const toIndex = args.indexOf('--to')
+
     if (args.length < 3 || toIndex === -1 || toIndex === args.length - 1) {
-      console.error('Usage: edgit deploy set <component> <version> --to <env>');
-      console.error('       edgit deploy <component> <version> --to <env>');
-      process.exit(1);
+      console.error('Usage: edgit deploy set <component> <version> --to <env>')
+      console.error('       edgit deploy <component> <version> --to <env>')
+      process.exit(1)
     }
 
-    const componentName = args[0];
-    const version = args[1];
-    const environment = args[toIndex + 1];
+    const componentName = args[0]
+    const version = args[1]
+    const environment = args[toIndex + 1]
 
     if (!componentName || !version || !environment) {
-      console.error('Component name, version, and environment are required');
-      process.exit(1);
+      console.error('Component name, version, and environment are required')
+      process.exit(1)
     }
 
     // Load registry to verify component exists
-    const registry = await this.loadRegistry();
-    const component = ComponentUtils.findComponentByName(registry, componentName);
-    
+    const registry = await this.loadRegistry()
+    const component = ComponentUtils.findComponentByName(registry, componentName)
+
     if (!component) {
-      console.error(`❌ Component '${componentName}' not found`);
-      console.log(`Available components: ${ComponentUtils.listComponentNames(registry).join(', ')}`);
-      process.exit(1);
+      console.error(`❌ Component '${componentName}' not found`)
+      console.log(`Available components: ${ComponentUtils.listComponentNames(registry).join(', ')}`)
+      process.exit(1)
     }
 
     try {
       // Resolve version to SHA
-      const sha = await this.tagManager.resolveRef(componentName, version);
-      
+      const sha = await this.tagManager.resolveRef(componentName, version)
+
       // Move deployment tag to this SHA
       const gitTag = await this.tagManager.moveDeploymentTag(
         componentName,
         environment,
         sha,
         `Deploy ${componentName}@${version} to ${environment}`
-      );
+      )
 
-      console.log(`✅ Deployed ${componentName}@${version} to ${environment}`);
-      console.log(`   Git tag: ${gitTag} → ${sha.substring(0, 8)}`);
-      
+      console.log(`✅ Deployed ${componentName}@${version} to ${environment}`)
+      console.log(`   Git tag: ${gitTag} → ${sha.substring(0, 8)}`)
+
       // Show what's now deployed with the specific version that was deployed
-      await this.showSpecificDeployment(componentName, environment, version, sha);
-      
-      console.log(`\n💡 Push with: git push origin ${gitTag} --force`);
-      
+      await this.showSpecificDeployment(componentName, environment, version, sha)
+
+      console.log(`\n💡 Push with: git push origin ${gitTag} --force`)
     } catch (error) {
-      console.error(`❌ Failed to deploy: ${error instanceof Error ? error.message : error}`);
-      process.exit(1);
+      console.error(`❌ Failed to deploy: ${error instanceof Error ? error.message : error}`)
+      process.exit(1)
     }
   }
 
@@ -111,75 +112,79 @@ export class DeployCommand extends Command {
    * Usage: edgit deploy promote <component> --from <source-env> --to <target-env>
    */
   async promoteComponent(args: string[]): Promise<void> {
-    const fromIndex = args.indexOf('--from');
-    const toIndex = args.indexOf('--to');
-    
-    if (args.length < 5 || fromIndex === -1 || toIndex === -1 || 
-        fromIndex === args.length - 1 || toIndex === args.length - 1) {
-      console.error('Usage: edgit deploy promote <component> --from <source-env> --to <target-env>');
-      process.exit(1);
+    const fromIndex = args.indexOf('--from')
+    const toIndex = args.indexOf('--to')
+
+    if (
+      args.length < 5 ||
+      fromIndex === -1 ||
+      toIndex === -1 ||
+      fromIndex === args.length - 1 ||
+      toIndex === args.length - 1
+    ) {
+      console.error('Usage: edgit deploy promote <component> --from <source-env> --to <target-env>')
+      process.exit(1)
     }
 
-    const componentName = args[0];
-    const fromEnv = args[fromIndex + 1];
-    const toEnv = args[toIndex + 1];
+    const componentName = args[0]
+    const fromEnv = args[fromIndex + 1]
+    const toEnv = args[toIndex + 1]
 
     if (!componentName || !fromEnv || !toEnv) {
-      console.error('Component name, source environment, and target environment are required');
-      process.exit(1);
+      console.error('Component name, source environment, and target environment are required')
+      process.exit(1)
     }
 
     // Load registry to verify component exists
-    const registry = await this.loadRegistry();
-    const component = ComponentUtils.findComponentByName(registry, componentName);
-    
+    const registry = await this.loadRegistry()
+    const component = ComponentUtils.findComponentByName(registry, componentName)
+
     if (!component) {
-      console.error(`❌ Component '${componentName}' not found`);
-      console.log(`Available components: ${ComponentUtils.listComponentNames(registry).join(', ')}`);
-      process.exit(1);
+      console.error(`❌ Component '${componentName}' not found`)
+      console.log(`Available components: ${ComponentUtils.listComponentNames(registry).join(', ')}`)
+      process.exit(1)
     }
 
     try {
       // Get SHA from source environment
-      const fromSHA = await this.tagManager.getTagSHA(componentName, fromEnv);
-      
+      const fromSHA = await this.tagManager.getTagSHA(componentName, fromEnv)
+
       // Get version info for the SHA (find which version tag points to this SHA)
-      const versionTags = await this.tagManager.getVersionTags(componentName);
-      let versionInfo = 'unknown';
-      
+      const versionTags = await this.tagManager.getVersionTags(componentName)
+      let versionInfo = 'unknown'
+
       for (const versionTag of versionTags) {
         try {
-          const versionSHA = await this.tagManager.getTagSHA(componentName, versionTag);
+          const versionSHA = await this.tagManager.getTagSHA(componentName, versionTag)
           if (versionSHA === fromSHA) {
-            versionInfo = versionTag;
-            break;
+            versionInfo = versionTag
+            break
           }
         } catch {
           // Continue searching
         }
       }
-      
+
       // Move target environment tag to same SHA
       const gitTag = await this.tagManager.moveDeploymentTag(
         componentName,
         toEnv,
         fromSHA,
         `Promote ${componentName} from ${fromEnv} to ${toEnv}`
-      );
+      )
 
-      console.log(`✅ Promoted ${componentName} from ${fromEnv} to ${toEnv}`);
-      console.log(`   Version: ${versionInfo}`);
-      console.log(`   SHA: ${fromSHA.substring(0, 8)}`);
-      console.log(`   Git tag: ${gitTag}`);
-      
+      console.log(`✅ Promoted ${componentName} from ${fromEnv} to ${toEnv}`)
+      console.log(`   Version: ${versionInfo}`)
+      console.log(`   SHA: ${fromSHA.substring(0, 8)}`)
+      console.log(`   Git tag: ${gitTag}`)
+
       // Show deployment status
-      await this.showEnvironmentStatus(componentName, toEnv);
-      
-      console.log(`\n💡 Push with: git push origin ${gitTag} --force`);
-      
+      await this.showEnvironmentStatus(componentName, toEnv)
+
+      console.log(`\n💡 Push with: git push origin ${gitTag} --force`)
     } catch (error) {
-      console.error(`❌ Failed to promote: ${error instanceof Error ? error.message : error}`);
-      process.exit(1);
+      console.error(`❌ Failed to promote: ${error instanceof Error ? error.message : error}`)
+      process.exit(1)
     }
   }
 
@@ -188,18 +193,18 @@ export class DeployCommand extends Command {
    * Usage: edgit deploy status [component]
    */
   async showDeploymentStatus(args: string[]): Promise<void> {
-    const registry = await this.loadRegistry();
-    
+    const registry = await this.loadRegistry()
+
     if (args.length === 0) {
       // Show status for all components
-      await this.showAllDeploymentStatus(registry);
+      await this.showAllDeploymentStatus(registry)
     } else {
-      const componentName = args[0];
+      const componentName = args[0]
       if (!componentName) {
-        console.error('Component name is required');
-        process.exit(1);
+        console.error('Component name is required')
+        process.exit(1)
       }
-      await this.showComponentDeploymentStatus(componentName, registry);
+      await this.showComponentDeploymentStatus(componentName, registry)
     }
   }
 
@@ -208,15 +213,15 @@ export class DeployCommand extends Command {
    * Usage: edgit deploy list [environment]
    */
   async listDeployments(args: string[]): Promise<void> {
-    const registry = await this.loadRegistry();
-    const targetEnv = args[0];
-    
+    const registry = await this.loadRegistry()
+    const targetEnv = args[0]
+
     if (targetEnv) {
       // List deployments for specific environment
-      await this.listEnvironmentDeployments(targetEnv, registry);
+      await this.listEnvironmentDeployments(targetEnv, registry)
     } else {
       // List all deployments
-      await this.listAllDeployments(registry);
+      await this.listAllDeployments(registry)
     }
   }
 
@@ -225,50 +230,51 @@ export class DeployCommand extends Command {
    * Usage: edgit deploy rollback <component> --env <environment> [--to <version>]
    */
   async rollbackDeployment(args: string[]): Promise<void> {
-    const envIndex = args.indexOf('--env');
-    const toIndex = args.indexOf('--to');
-    
+    const envIndex = args.indexOf('--env')
+    const toIndex = args.indexOf('--to')
+
     if (args.length < 3 || envIndex === -1 || envIndex === args.length - 1) {
-      console.error('Usage: edgit deploy rollback <component> --env <environment> [--to <version>]');
-      process.exit(1);
+      console.error('Usage: edgit deploy rollback <component> --env <environment> [--to <version>]')
+      process.exit(1)
     }
 
-    const componentName = args[0];
-    const environment = args[envIndex + 1];
-    const targetVersion = toIndex !== -1 && toIndex < args.length - 1 ? args[toIndex + 1] : undefined;
+    const componentName = args[0]
+    const environment = args[envIndex + 1]
+    const targetVersion =
+      toIndex !== -1 && toIndex < args.length - 1 ? args[toIndex + 1] : undefined
 
     if (!componentName || !environment) {
-      console.error('Component name and environment are required');
-      process.exit(1);
+      console.error('Component name and environment are required')
+      process.exit(1)
     }
 
     // Load registry to verify component exists
-    const registry = await this.loadRegistry();
-    const component = ComponentUtils.findComponentByName(registry, componentName);
-    
+    const registry = await this.loadRegistry()
+    const component = ComponentUtils.findComponentByName(registry, componentName)
+
     if (!component) {
-      console.error(`❌ Component '${componentName}' not found`);
-      process.exit(1);
+      console.error(`❌ Component '${componentName}' not found`)
+      process.exit(1)
     }
 
     try {
-      let rollbackSHA: string;
-      let rollbackVersion: string;
+      let rollbackSHA: string
+      let rollbackVersion: string
 
       if (targetVersion) {
         // Rollback to specific version
-        rollbackSHA = await this.tagManager.resolveRef(componentName, targetVersion);
-        rollbackVersion = targetVersion;
+        rollbackSHA = await this.tagManager.resolveRef(componentName, targetVersion)
+        rollbackVersion = targetVersion
       } else {
         // Find previous version (simplified - get second-to-last version tag)
-        const versionTags = await this.tagManager.getVersionTags(componentName);
+        const versionTags = await this.tagManager.getVersionTags(componentName)
         if (versionTags.length < 2) {
-          console.error(`❌ No previous version found for rollback`);
-          process.exit(1);
+          console.error('❌ No previous version found for rollback')
+          process.exit(1)
         }
-        
-        rollbackVersion = versionTags[versionTags.length - 2]!; // Second-to-last (guaranteed to exist)
-        rollbackSHA = await this.tagManager.getTagSHA(componentName, rollbackVersion);
+
+        rollbackVersion = versionTags[versionTags.length - 2]! // Second-to-last (guaranteed to exist)
+        rollbackSHA = await this.tagManager.getTagSHA(componentName, rollbackVersion)
       }
 
       // Move deployment tag to rollback SHA
@@ -277,17 +283,16 @@ export class DeployCommand extends Command {
         environment,
         rollbackSHA,
         `Rollback ${componentName} in ${environment} to ${rollbackVersion}`
-      );
+      )
 
-      console.log(`✅ Rolled back ${componentName} in ${environment} to ${rollbackVersion}`);
-      console.log(`   SHA: ${rollbackSHA.substring(0, 8)}`);
-      console.log(`   Git tag: ${gitTag}`);
-      
-      console.log(`\n💡 Push with: git push origin ${gitTag} --force`);
-      
+      console.log(`✅ Rolled back ${componentName} in ${environment} to ${rollbackVersion}`)
+      console.log(`   SHA: ${rollbackSHA.substring(0, 8)}`)
+      console.log(`   Git tag: ${gitTag}`)
+
+      console.log(`\n💡 Push with: git push origin ${gitTag} --force`)
     } catch (error) {
-      console.error(`❌ Failed to rollback: ${error instanceof Error ? error.message : error}`);
-      process.exit(1);
+      console.error(`❌ Failed to rollback: ${error instanceof Error ? error.message : error}`)
+      process.exit(1)
     }
   }
 
@@ -297,56 +302,61 @@ export class DeployCommand extends Command {
    * Show deployment status for all components
    */
   private async showAllDeploymentStatus(registry: ComponentRegistry): Promise<void> {
-    const componentNames = ComponentUtils.listComponentNames(registry);
-    
+    const componentNames = ComponentUtils.listComponentNames(registry)
+
     if (componentNames.length === 0) {
-      console.log('No components registered');
-      return;
+      console.log('No components registered')
+      return
     }
 
-    console.log('🚀 Deployment Status:\n');
-    
+    console.log('🚀 Deployment Status:\n')
+
     for (const componentName of componentNames) {
-      await this.showComponentDeploymentStatus(componentName, registry, false);
-      console.log(); // Empty line between components
+      await this.showComponentDeploymentStatus(componentName, registry, false)
+      console.log() // Empty line between components
     }
   }
 
   /**
    * Show deployment status for a specific component
    */
-  private async showComponentDeploymentStatus(componentName: string, registry: ComponentRegistry, standalone: boolean = true): Promise<void> {
-    const component = ComponentUtils.findComponentByName(registry, componentName);
-    
+  private async showComponentDeploymentStatus(
+    componentName: string,
+    registry: ComponentRegistry,
+    standalone: boolean = true
+  ): Promise<void> {
+    const component = ComponentUtils.findComponentByName(registry, componentName)
+
     if (!component) {
-      console.error(`❌ Component '${componentName}' not found`);
+      console.error(`❌ Component '${componentName}' not found`)
       if (standalone) {
-        process.exit(1);
+        process.exit(1)
       }
-      return;
+      return
     }
 
     try {
-      const deploymentTags = await this.tagManager.getDeploymentTags(componentName);
-      
-      console.log(`📦 ${componentName} (${component.type})`);
-      console.log(`   Path: ${component.path}`);
-      
+      const deploymentTags = await this.tagManager.getDeploymentTags(componentName)
+
+      console.log(`📦 ${componentName} (${component.type})`)
+      console.log(`   Path: ${component.path}`)
+
       if (deploymentTags.length === 0) {
-        console.log(`   No deployments`);
-        return;
+        console.log('   No deployments')
+        return
       }
-      
-      console.log(`   Deployments:`);
-      
+
+      console.log('   Deployments:')
+
       for (const env of deploymentTags) {
-        await this.showEnvironmentStatus(componentName, env, '     ');
+        await this.showEnvironmentStatus(componentName, env, '     ')
       }
-      
     } catch (error) {
-      console.error(`❌ Failed to get deployment status for ${componentName}: ${error instanceof Error ? error.message : error}`);
+      console.error(
+        `❌ Failed to get deployment status for ${componentName}: ${error instanceof Error ? error.message : error}`
+      )
       if (standalone) {
-        process.exit(1);
+        process.exit(1)
       }
     }
   }
@@ -354,90 +364,100 @@ export class DeployCommand extends Command {
   /**
    * Show status for a specific environment
    */
-  private async showEnvironmentStatus(componentName: string, environment: string, indent: string = '   '): Promise<void> {
+  private async showEnvironmentStatus(
+    componentName: string,
+    environment: string,
+    indent: string = '   '
+  ): Promise<void> {
     try {
-      const sha = await this.tagManager.getTagSHA(componentName, environment);
-      const tagInfo = await this.tagManager.getTagInfo(componentName, environment);
-      
+      const sha = await this.tagManager.getTagSHA(componentName, environment)
+      const tagInfo = await this.tagManager.getTagInfo(componentName, environment)
+
       // Try to extract version from deployment tag message first
-      let version = 'custom';
-      const deployMessage = tagInfo.message;
-      const versionMatch = deployMessage.match(/@(v?[\d\.\w\-]+)\s+to\s+/);
-      
+      let version = 'custom'
+      const deployMessage = tagInfo.message
+      const versionMatch = deployMessage.match(/@(v?[\d\.\w\-]+)\s+to\s+/)
+
       if (versionMatch) {
         // Found version in deployment tag message
-        version = versionMatch[1]!;
+        version = versionMatch[1]!
       } else {
         // Fallback: find matching version tags and use the latest one
-        const versionTags = await this.tagManager.getVersionTags(componentName);
-        const matchingVersions: string[] = [];
-        
+        const versionTags = await this.tagManager.getVersionTags(componentName)
+        const matchingVersions: string[] = []
+
         for (const versionTag of versionTags) {
           try {
-            const versionSHA = await this.tagManager.getTagSHA(componentName, versionTag);
+            const versionSHA = await this.tagManager.getTagSHA(componentName, versionTag)
             if (versionSHA === sha) {
-              matchingVersions.push(versionTag);
+              matchingVersions.push(versionTag)
             }
           } catch {
             // Continue searching
           }
         }
-        
+
         // If we found matching versions, use the latest one (last in sorted array)
         if (matchingVersions.length > 0) {
-          version = matchingVersions[matchingVersions.length - 1]!;
+          version = matchingVersions[matchingVersions.length - 1]!
         }
       }
-      
-      console.log(`${indent}${environment}: ${version} (${sha.substring(0, 8)}) - ${tagInfo.date}`);
-      
+
+      console.log(`${indent}${environment}: ${version} (${sha.substring(0, 8)}) - ${tagInfo.date}`)
     } catch (error) {
-      console.log(`${indent}${environment}: not deployed`);
+      console.log(`${indent}${environment}: not deployed`)
     }
   }
 
   /**
    * Show deployment confirmation with the specific version that was deployed
    */
-  private async showSpecificDeployment(componentName: string, environment: string, version: string, sha: string): Promise<void> {
+  private async showSpecificDeployment(
+    componentName: string,
+    environment: string,
+    version: string,
+    sha: string
+  ): Promise<void> {
     try {
-      const tagInfo = await this.tagManager.getTagInfo(componentName, environment);
-      console.log(`   ${environment}: ${version} (${sha.substring(0, 8)}) - ${tagInfo.date}`);
+      const tagInfo = await this.tagManager.getTagInfo(componentName, environment)
+      console.log(`   ${environment}: ${version} (${sha.substring(0, 8)}) - ${tagInfo.date}`)
     } catch (error) {
-      console.log(`   ${environment}: ${version} (${sha.substring(0, 8)}) - just deployed`);
+      console.log(`   ${environment}: ${version} (${sha.substring(0, 8)}) - just deployed`)
     }
   }
 
   /**
    * List deployments for a specific environment
    */
-  private async listEnvironmentDeployments(environment: string, registry: ComponentRegistry): Promise<void> {
-    const componentNames = ComponentUtils.listComponentNames(registry);
-    
-    console.log(`🚀 Deployments in ${environment}:\n`);
-    
+  private async listEnvironmentDeployments(
+    environment: string,
+    registry: ComponentRegistry
+  ): Promise<void> {
+    const componentNames = ComponentUtils.listComponentNames(registry)
+
+    console.log(`🚀 Deployments in ${environment}:\n`)
+
     for (const componentName of componentNames) {
       try {
-        const sha = await this.tagManager.getTagSHA(componentName, environment);
-        
+        const sha = await this.tagManager.getTagSHA(componentName, environment)
+
         // Find version for this SHA
-        const versionTags = await this.tagManager.getVersionTags(componentName);
-        let version = 'custom';
-        
+        const versionTags = await this.tagManager.getVersionTags(componentName)
+        let version = 'custom'
+
         for (const versionTag of versionTags) {
           try {
-            const versionSHA = await this.tagManager.getTagSHA(componentName, versionTag);
+            const versionSHA = await this.tagManager.getTagSHA(componentName, versionTag)
             if (versionSHA === sha) {
-              version = versionTag;
-              break;
+              version = versionTag
+              break
             }
           } catch {
             // Continue searching
           }
         }
-        
-        console.log(`📦 ${componentName}: ${version} (${sha.substring(0, 8)})`);
-        
+
+        console.log(`📦 ${componentName}: ${version} (${sha.substring(0, 8)})`)
       } catch {
         // Component not deployed in this environment
       }
@@ -448,29 +468,29 @@ export class DeployCommand extends Command {
    * List all deployments across all environments
    */
   private async listAllDeployments(registry: ComponentRegistry): Promise<void> {
-    const componentNames = ComponentUtils.listComponentNames(registry);
-    const environments = new Set<string>();
-    
+    const componentNames = ComponentUtils.listComponentNames(registry)
+    const environments = new Set<string>()
+
     // Collect all environments
     for (const componentName of componentNames) {
       try {
-        const deploymentTags = await this.tagManager.getDeploymentTags(componentName);
-        deploymentTags.forEach(env => environments.add(env));
+        const deploymentTags = await this.tagManager.getDeploymentTags(componentName)
+        deploymentTags.forEach((env) => environments.add(env))
       } catch {
         // Continue
       }
     }
-    
+
     if (environments.size === 0) {
-      console.log('No deployments found');
-      return;
+      console.log('No deployments found')
+      return
     }
-    
-    console.log('🚀 All Deployments:\n');
-    
+
+    console.log('🚀 All Deployments:\n')
+
     for (const env of Array.from(environments).sort()) {
-      await this.listEnvironmentDeployments(env, registry);
-      console.log(); // Empty line between environments
+      await this.listEnvironmentDeployments(env, registry)
+      console.log() // Empty line between environments
     }
   }
 
@@ -478,14 +498,14 @@ export class DeployCommand extends Command {
    * Load component registry
    */
   private async loadRegistry(): Promise<ComponentRegistry> {
-    const registryPath = path.join(process.cwd(), '.edgit', 'components.json');
-    
+    const registryPath = path.join(process.cwd(), '.edgit', 'components.json')
+
     try {
-      const content = await fs.readFile(registryPath, 'utf-8');
-      return JSON.parse(content);
+      const content = await fs.readFile(registryPath, 'utf-8')
+      return JSON.parse(content)
     } catch {
       // Return empty registry if file doesn't exist
-      return ComponentUtils.createEmptyRegistry();
+      return ComponentUtils.createEmptyRegistry()
     }
   }
 
@@ -526,13 +546,13 @@ NOTES:
   - Deployment tags are force-pushed (they can move)
   - Version tags are immutable (they never move)
   - Always push deployment tags with --force: git push origin <tag> --force
-`;
+`
   }
 
   /**
    * Show help for deploy command
    */
   private async showHelp(): Promise<void> {
-    console.log(this.getHelp());
+    console.log(this.getHelp())
   }
 }

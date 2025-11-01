@@ -22,14 +22,10 @@ export class Command {
         // Legacy commands for backward compatibility
         'scan',
         'detect',
-        'history'
+        'history',
     ];
     // Commands that should show component-aware information
-    static ENHANCED_COMMANDS = [
-        'status',
-        'log',
-        'diff'
-    ];
+    static ENHANCED_COMMANDS = ['status', 'log', 'diff'];
     constructor(git, detector) {
         this.git = git || GitWrapper.getInstance();
         this.detector = detector;
@@ -89,9 +85,9 @@ export class Command {
         const gitCheck = await this.git.checkGitInstalled();
         if (!gitCheck.installed) {
             const error = gitCheck.error || 'Git not found';
-            throw new Error(`Git is not installed or not available in PATH.\n` +
+            throw new Error('Git is not installed or not available in PATH.\n' +
                 `Error: ${error}\n` +
-                `Please install Git from https://git-scm.com/downloads`);
+                'Please install Git from https://git-scm.com/downloads');
         }
     }
     /**
@@ -101,7 +97,7 @@ export class Command {
         console.error(`❌ ${message}`);
         if (suggestions && suggestions.length > 0) {
             console.error('\n💡 Suggestions:');
-            suggestions.forEach(suggestion => {
+            suggestions.forEach((suggestion) => {
                 console.error(`   • ${suggestion}`);
             });
         }
@@ -211,7 +207,7 @@ export async function createCommandContext(workspaceDir) {
         workspaceDir: workspaceDir,
         env: process.env,
         isCI: Boolean(process.env.CI),
-        debug: Boolean(process.env.EDGIT_DEBUG)
+        debug: Boolean(process.env.EDGIT_DEBUG),
     };
     if (repoRoot) {
         context.repoRoot = repoRoot;

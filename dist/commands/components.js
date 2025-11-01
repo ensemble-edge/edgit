@@ -64,7 +64,7 @@ export class ComponentsCommand extends Command {
             this.showError(`Component operation failed: ${message}`, [
                 'Ensure edgit is initialized with "edgit init"',
                 'Check that the component name is correct',
-                'Use "edgit components" to list all components'
+                'Use "edgit components" to list all components',
             ]);
             throw error;
         }
@@ -121,7 +121,7 @@ export class ComponentsCommand extends Command {
             const deploymentTags = await this.tagManager.getDeploymentTags(componentName);
             // Show version tags
             if (versionTags.length > 0) {
-                console.log(`\n🏷️  Version Tags:`);
+                console.log('\n🏷️  Version Tags:');
                 for (const version of versionTags) {
                     try {
                         const tagInfo = await this.tagManager.getTagInfo(componentName, version);
@@ -134,7 +134,7 @@ export class ComponentsCommand extends Command {
             }
             // Show deployment tags
             if (deploymentTags.length > 0) {
-                console.log(`\n🚀 Deployment Tags:`);
+                console.log('\n🚀 Deployment Tags:');
                 for (const env of deploymentTags) {
                     try {
                         const tagInfo = await this.tagManager.getTagInfo(componentName, env);
@@ -160,9 +160,9 @@ export class ComponentsCommand extends Command {
                 }
             }
             // Show custom tags
-            const customTags = allTags.filter(tag => !versionTags.includes(tag) && !deploymentTags.includes(tag));
+            const customTags = allTags.filter((tag) => !versionTags.includes(tag) && !deploymentTags.includes(tag));
             if (customTags.length > 0) {
-                console.log(`\n🏷️  Custom Tags:`);
+                console.log('\n🏷️  Custom Tags:');
                 for (const tag of customTags) {
                     try {
                         const tagInfo = await this.tagManager.getTagInfo(componentName, tag);
@@ -174,12 +174,12 @@ export class ComponentsCommand extends Command {
                 }
             }
             if (allTags.length === 0) {
-                console.log(`\n⚠️  No tags found for this component`);
+                console.log('\n⚠️  No tags found for this component');
                 console.log(`   Create tags with: edgit tag ${componentName} <tagname>`);
             }
             // Show file content if requested
             if (flags.content || flags.c) {
-                console.log(`\n📄 Current Content:`);
+                console.log('\n📄 Current Content:');
                 try {
                     const repoRoot = await this.git.getRepoRoot();
                     if (repoRoot) {
@@ -196,7 +196,7 @@ export class ComponentsCommand extends Command {
         catch (error) {
             console.log(`\n⚠️  Error getting Git tag information: ${error instanceof Error ? error.message : error}`);
         }
-        console.log(`\n💡 Commands:`);
+        console.log('\n💡 Commands:');
         console.log(`   edgit tag ${componentName} v1.0.0          # Create version tag`);
         console.log(`   edgit tag ${componentName} prod            # Create deployment tag`);
         console.log(`   edgit checkout ${componentName}@v1.0.0     # Checkout specific version`);
@@ -289,7 +289,7 @@ export class ComponentsCommand extends Command {
         console.log(`✅ Added component '${name}'`);
         console.log(`   Path: ${filePath}`);
         console.log(`   Type: ${componentType}`);
-        console.log(`\n💡 Next steps:`);
+        console.log('\n💡 Next steps:');
         console.log(`   edgit tag ${name} v1.0.0     # Create first version tag`);
         console.log(`   edgit tag ${name} prod       # Create deployment tag`);
     }
@@ -306,8 +306,8 @@ export class ComponentsCommand extends Command {
             if (tags.length > 0 && !flags.force) {
                 console.log(`⚠️  Component '${componentName}' has ${tags.length} Git tags:`);
                 console.log(`   ${tags.join(', ')}`);
-                console.log(`\n   Use --force to remove anyway (Git tags will remain)`);
-                console.log(`   Or manually delete tags first with: edgit tag delete <component>@<tag>`);
+                console.log('\n   Use --force to remove anyway (Git tags will remain)');
+                console.log('   Or manually delete tags first with: edgit tag delete <component>@<tag>');
                 return;
             }
         }
@@ -317,7 +317,7 @@ export class ComponentsCommand extends Command {
         ComponentUtils.removeComponent(registry, componentName);
         await this.saveComponentsRegistry(registry);
         console.log(`✅ Removed component '${componentName}' from registry`);
-        console.log(`   Note: Git tags for this component still exist`);
+        console.log('   Note: Git tags for this component still exist');
         console.log(`   Use: edgit tag list ${componentName} to see them`);
     }
     /**
@@ -352,7 +352,7 @@ export class ComponentsCommand extends Command {
                 console.log(`📦 ${name}`);
                 console.log(`   Type: ${component.type}`);
                 console.log(`   Path: ${component.path}`);
-                console.log(`   Tags: error getting info`);
+                console.log('   Tags: error getting info');
             }
             else {
                 console.log(`   📦 ${name}: (error getting tag info)`);

@@ -13,10 +13,10 @@ export class ComponentDetector {
         prompt: [
             'prompts/**/*', // Any file in prompts/ directory
             '**/prompt*', // Files starting with "prompt"
-            '**/*prompt*', // Files containing "prompt" 
+            '**/*prompt*', // Files containing "prompt"
             '**/*.prompt.*', // Files with .prompt in name
             'instructions/**/*', // Instructions directory
-            'templates/**/*' // Templates directory
+            'templates/**/*', // Templates directory
         ],
         agent: [
             'agents/**/*', // Any file in agents/ directory
@@ -26,16 +26,16 @@ export class ComponentDetector {
             'scripts/**/*.sh', // Shell scripts
             'scripts/**/*.bash', // Bash scripts
             '**/*.agent.*', // Files with .agent in name
-            '**/agent*' // Files starting with "agent"
+            '**/agent*', // Files starting with "agent"
         ],
         sql: [
             'queries/**/*', // Any file in queries/ directory
-            'sql/**/*', // Any file in sql/ directory  
+            'sql/**/*', // Any file in sql/ directory
             'database/**/*', // Any file in database/ directory
             '**/*.sql', // SQL extension files
             '**/*.query.*', // Files with .query in name
             '**/query*', // Files starting with "query"
-            '**/schema*' // Schema files
+            '**/schema*', // Schema files
         ],
         config: [
             'configs/**/*', // Any file in configs/ directory
@@ -47,8 +47,8 @@ export class ComponentDetector {
             '**/*.json', // JSON files (often config)
             '**/*.toml', // TOML files
             '**/*.ini', // INI files
-            '**/config*' // Files starting with "config"
-        ]
+            '**/config*', // Files starting with "config"
+        ],
     };
     constructor(git) {
         this.git = git || GitWrapper.getInstance();
@@ -98,7 +98,7 @@ export class ComponentDetector {
                         type: component.type,
                         name: component.name,
                         path: filePath,
-                        action: 'modified'
+                        action: 'modified',
                     });
                 }
             }
@@ -124,7 +124,7 @@ export class ComponentDetector {
                         type: component.type,
                         name: component.name,
                         path: filePath,
-                        action: 'modified' // Could be enhanced to detect actual action
+                        action: 'modified', // Could be enhanced to detect actual action
                     });
                 }
             }
@@ -151,7 +151,7 @@ export class ComponentDetector {
             if (result.exitCode !== 0) {
                 throw new Error(`Git ls-files failed: ${result.stderr}`);
             }
-            const files = result.stdout.split('\n').filter(line => line.trim());
+            const files = result.stdout.split('\n').filter((line) => line.trim());
             const components = [];
             for (const filePath of files) {
                 const component = this.detectComponent(filePath);
@@ -159,7 +159,7 @@ export class ComponentDetector {
                     components.push({
                         type: component.type,
                         name: component.name,
-                        path: filePath
+                        path: filePath,
                     });
                 }
             }
@@ -182,15 +182,15 @@ export class ComponentDetector {
     async getComponentsByType(type) {
         const allComponents = await this.getAllComponents();
         return allComponents
-            .filter(component => component.type === type)
-            .map(component => ({ name: component.name, path: component.path }));
+            .filter((component) => component.type === type)
+            .map((component) => ({ name: component.name, path: component.path }));
     }
     /**
      * Find component by name across all types
      */
     async findComponentByName(name) {
         const allComponents = await this.getAllComponents();
-        return allComponents.find(component => component.name === name) || null;
+        return allComponents.find((component) => component.name === name) || null;
     }
     /**
      * Validate component patterns
@@ -226,7 +226,7 @@ export class ComponentDetector {
                     pattern,
                     confidence: 0.8,
                     description: `Default ${type} pattern`,
-                    isCustom: false
+                    isCustom: false,
                 });
             });
         });

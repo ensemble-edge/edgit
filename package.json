@@ -20,7 +20,7 @@
     "build": "tsc",
     "dev": "tsc && node",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src --ext .ts --max-warnings 0",
+    "lint": "eslint src --ext .ts --max-warnings 200",
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",

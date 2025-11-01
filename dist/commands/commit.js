@@ -24,7 +24,7 @@ export class CommitCommand extends Command {
             await this.validateGitInstalled();
             await this.validateGitRepo();
             // Check if this is a component-aware repository
-            if (!await this.isEdgitInitialized()) {
+            if (!(await this.isEdgitInitialized())) {
                 this.showWarning('Edgit not initialized. Passing through to git commit.');
                 await this.git.passthrough(['commit', ...args]);
                 return;
@@ -90,7 +90,7 @@ export class CommitCommand extends Command {
                             type: component.type,
                             name,
                             path: component.path,
-                            action
+                            action,
                         });
                         break;
                     }
@@ -154,7 +154,7 @@ export class CommitCommand extends Command {
                     action: comp.action,
                     diff: diff || '',
                     oldVersion: 'n/a', // No version tracking in Git tag system
-                    newVersion: 'n/a' // Versions are created via tags
+                    newVersion: 'n/a', // Versions are created via tags
                 };
             }));
             // Get current branch and recent commits for context
@@ -171,13 +171,13 @@ export class CommitCommand extends Command {
                 maxDiffSize: 4000,
                 timeout: 30000,
                 generateComponentMessages: true,
-                includeVersionsInCommit: false // No version tracking in Git tag system
+                includeVersionsInCommit: false, // No version tracking in Git tag system
             };
             const aiManager = new AICommitManager(aiConfig);
             const aiResponse = await aiManager.generateRepoMessage({
                 components: componentChanges,
                 stagedFiles: stagedFiles,
-                overallDiff: overallDiff
+                overallDiff: overallDiff,
             });
             if (aiResponse.success && aiResponse.message) {
                 console.log(`📝 AI generated message: "${aiResponse.message}"`);
@@ -200,15 +200,15 @@ export class CommitCommand extends Command {
      * Show summary of changed components (without versioning info)
      */
     async showComponentsSummary(changedComponents) {
-        console.log(`\n📦 Component Changes:`);
+        console.log('\n📦 Component Changes:');
         for (const comp of changedComponents) {
             const emoji = comp.action === 'added' ? '➕' : comp.action === 'deleted' ? '❌' : '📝';
             console.log(`   ${emoji} ${comp.name} (${comp.type}) - ${comp.action}`);
         }
-        console.log(`\n💡 Git tag-based versioning:`);
-        console.log(`   Create version tags: edgit tag <component> v1.0.0`);
-        console.log(`   Deploy to environment: edgit deploy <component> v1.0.0 --to prod`);
-        console.log(`   View component history: edgit components show <component>`);
+        console.log('\n💡 Git tag-based versioning:');
+        console.log('   Create version tags: edgit tag <component> v1.0.0');
+        console.log('   Deploy to environment: edgit deploy <component> v1.0.0 --to prod');
+        console.log('   View component history: edgit components show <component>');
     }
     /**
      * Check if edgit is initialized

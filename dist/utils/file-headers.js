@@ -8,60 +8,60 @@ export const DEFAULT_HEADER_FORMATS = {
     '.md': {
         prefix: '<!-- ',
         suffix: ' -->',
-        template: 'Edgit: id={componentId} version={version} component={component}'
+        template: 'Edgit: id={componentId} version={version} component={component}',
     },
     // Text files
     '.txt': {
         prefix: '<!-- ',
         suffix: ' -->',
-        template: 'Edgit: id={componentId} version={version} component={component}'
+        template: 'Edgit: id={componentId} version={version} component={component}',
     },
     // Prompt files (treat as text with HTML comments)
     '.prompt': {
         prefix: '<!-- ',
         suffix: ' -->',
-        template: 'Edgit: id={componentId} version={version} component={component}'
+        template: 'Edgit: id={componentId} version={version} component={component}',
     },
     // YAML files
     '.yaml': {
         prefix: '# ',
         suffix: '',
-        template: 'Edgit: id={componentId} version={version} component={component}'
+        template: 'Edgit: id={componentId} version={version} component={component}',
     },
     '.yml': {
         prefix: '# ',
         suffix: '',
-        template: 'Edgit: id={componentId} version={version} component={component}'
+        template: 'Edgit: id={componentId} version={version} component={component}',
     },
     // SQL files
     '.sql': {
         prefix: '-- ',
         suffix: '',
-        template: 'Edgit: id={componentId} version={version} component={component}'
+        template: 'Edgit: id={componentId} version={version} component={component}',
     },
     // JavaScript/TypeScript files
     '.js': {
         prefix: '/**\n * ',
         suffix: '\n */',
-        template: 'Edgit: id={componentId} version={version} component={component}'
+        template: 'Edgit: id={componentId} version={version} component={component}',
     },
     '.ts': {
         prefix: '/**\n * ',
         suffix: '\n */',
-        template: 'Edgit: id={componentId} version={version} component={component}'
+        template: 'Edgit: id={componentId} version={version} component={component}',
     },
     // Python files
     '.py': {
         prefix: '"""',
         suffix: '"""',
-        template: 'Edgit: id={componentId} version={version} component={component}'
+        template: 'Edgit: id={componentId} version={version} component={component}',
     },
     // JSON files (using comment-like structure)
     '.json': {
         prefix: '',
         suffix: '',
-        template: '"_edgit": {"id": "{componentId}", "version": "{version}", "component": "{component}"}'
-    }
+        template: '"_edgit": {"id": "{componentId}", "version": "{version}", "component": "{component}"}',
+    },
 };
 /**
  * YAML-specific metadata block for structured files
@@ -89,7 +89,7 @@ export class FileHeaderManager {
                 if (componentMatch && componentMatch[1]) {
                     header.name = componentMatch[1].trim();
                 }
-                // Match patterns like "# Type: prompt" or "// Type: prompt"  
+                // Match patterns like "# Type: prompt" or "// Type: prompt"
                 const typeMatch = trimmed.match(/^[#\/\*\-]*\s*Type:\s*(.+)$/i);
                 if (typeMatch && typeMatch[1]) {
                     header.type = typeMatch[1].trim().toLowerCase();
@@ -157,7 +157,7 @@ export class FileHeaderManager {
             format = {
                 prefix: '<!-- ',
                 suffix: ' -->',
-                template: 'Edgit: id={componentId} version={version} component={component}'
+                template: 'Edgit: id={componentId} version={version} component={component}',
             };
         }
         return format;
@@ -171,10 +171,10 @@ export class FileHeaderManager {
         // Override for potentially unsafe combinations
         const unsafeCombinations = [
             { ext: '.txt', type: 'sql' }, // .txt file containing SQL should use SQL comments
-            { ext: '.md', type: 'sql' }, // .md file containing SQL should use SQL comments  
+            { ext: '.md', type: 'sql' }, // .md file containing SQL should use SQL comments
             { ext: '.txt', type: 'config' }, // .txt file as config might be YAML-like
         ];
-        return unsafeCombinations.some(combo => combo.ext === ext && combo.type === componentType);
+        return unsafeCombinations.some((combo) => combo.ext === ext && combo.type === componentType);
     }
     /**
      * Get header format appropriate for component type
@@ -187,20 +187,20 @@ export class FileHeaderManager {
                 return {
                     prefix: '-- ',
                     suffix: '',
-                    template: 'Edgit: id={componentId} version={version} component={component}'
+                    template: 'Edgit: id={componentId} version={version} component={component}',
                 };
             case 'config':
                 return {
                     prefix: '# ',
                     suffix: '',
-                    template: 'Edgit: id={componentId} version={version} component={component}'
+                    template: 'Edgit: id={componentId} version={version} component={component}',
                 };
             case 'agent':
                 // Assume scripts - use /* */ comments
                 return {
                     prefix: '/* ',
                     suffix: ' */',
-                    template: 'Edgit: id={componentId} version={version} component={component}'
+                    template: 'Edgit: id={componentId} version={version} component={component}',
                 };
             case 'prompt':
             default:
@@ -208,7 +208,7 @@ export class FileHeaderManager {
                 return {
                     prefix: '<!-- ',
                     suffix: ' -->',
-                    template: 'Edgit: id={componentId} version={version} component={component}'
+                    template: 'Edgit: id={componentId} version={version} component={component}',
                 };
         }
     }
@@ -243,7 +243,7 @@ export class FileHeaderManager {
         if (match && match[1] && match[2]) {
             return {
                 version: match[1],
-                component: match[2]
+                component: match[2],
             };
         }
         return null;
@@ -259,20 +259,20 @@ export class FileHeaderManager {
             return {
                 componentId: newFormatMatch[1],
                 version: newFormatMatch[2],
-                component: newFormatMatch[3]
+                component: newFormatMatch[3],
             };
         }
         // Legacy formats (no ID)
         const legacyPatterns = [
             /Edgit:\s*version=([^\s]+)\s+component=([^\s\n\r]+)/,
-            /version=([^\s]+)\s+component=([^\s\n\r]+)/
+            /version=([^\s]+)\s+component=([^\s\n\r]+)/,
         ];
         for (const pattern of legacyPatterns) {
             const match = content.match(pattern);
             if (match && match[1] && match[2]) {
                 return {
                     version: match[1],
-                    component: match[2]
+                    component: match[2],
                 };
             }
         }
@@ -285,16 +285,14 @@ export class FileHeaderManager {
         const existing = this.parseYamlMetadata(content);
         if (existing && !replace) {
             // Update existing metadata
-            const metadataBlock = YAML_METADATA_BLOCK
-                .replace('{version}', metadata.version)
+            const metadataBlock = YAML_METADATA_BLOCK.replace('{version}', metadata.version)
                 .replace('{component}', metadata.component)
                 .replace('{updated}', new Date().toISOString());
             return content.replace(/^_edgit:\s*\n\s*version:.*?\n\s*component:.*?\n(\s*updated:.*?\n)?/m, metadataBlock + '\n\n');
         }
         else {
             // Add new metadata at the top
-            const metadataBlock = YAML_METADATA_BLOCK
-                .replace('{version}', metadata.version)
+            const metadataBlock = YAML_METADATA_BLOCK.replace('{version}', metadata.version)
                 .replace('{component}', metadata.component)
                 .replace('{updated}', new Date().toISOString());
             return metadataBlock + '\n\n' + content;
@@ -304,7 +302,7 @@ export class FileHeaderManager {
      * Update comment-based metadata
      */
     updateCommentMetadata(content, metadata, ext, replace = false, componentType) {
-        let format = this.getHeaderFormat(ext, componentType);
+        const format = this.getHeaderFormat(ext, componentType);
         const existing = this.parseCommentMetadata(content, ext);
         const headerText = format.template
             .replace('{componentId}', metadata.componentId || 'unknown')
@@ -318,7 +316,7 @@ export class FileHeaderManager {
                 /\/\*\*?\s*\n?\s*\*?\s*Edgit:.*?\*\//s,
                 /--\s*Edgit:.*?\n/,
                 /#\s*Edgit:.*?\n/,
-                /"""\s*Edgit:.*?"""/s
+                /"""\s*Edgit:.*?"""/s,
             ];
             for (const pattern of patterns) {
                 if (pattern.test(content)) {
@@ -344,7 +342,7 @@ export class FileHeaderManager {
             /\/\*\*?\s*\n?\s*\*?\s*Edgit:.*?\*\/\n?/s,
             /--\s*Edgit:.*?\n/,
             /#\s*Edgit:.*?\n/,
-            /"""\s*Edgit:.*?"""\n?/s
+            /"""\s*Edgit:.*?"""\n?/s,
         ];
         for (const pattern of patterns) {
             content = content.replace(pattern, '');

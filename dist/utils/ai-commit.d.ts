@@ -1,4 +1,4 @@
-import { AIConfig, AIResponse, CommitContext, ComponentChange } from '../types/ai-commit.js';
+import type { AIConfig, AIResponse, CommitContext, ComponentChange } from '../types/ai-commit.js';
 /**
  * Main AI commit orchestrator
  */

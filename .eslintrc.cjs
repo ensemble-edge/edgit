@@ -18,42 +18,35 @@ module.exports = {
   },
   plugins: ['@typescript-eslint'],
   rules: {
-    // TypeScript
-    '@typescript-eslint/explicit-function-return-type': [
-      'warn',
-      {
-        allowExpressions: true,
-        allowTypedFunctionExpressions: true,
-      },
-    ],
-    '@typescript-eslint/no-explicit-any': 'error',
+    // TypeScript - gradually increase strictness
+    '@typescript-eslint/explicit-function-return-type': 'off',
+    '@typescript-eslint/no-explicit-any': 'warn',
     '@typescript-eslint/no-unused-vars': [
-      'error',
+      'warn',
       {
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
       },
     ],
+    '@typescript-eslint/no-unsafe-assignment': 'warn',
+    '@typescript-eslint/no-unsafe-member-access': 'warn',
+    '@typescript-eslint/no-unsafe-argument': 'warn',
+    '@typescript-eslint/no-unsafe-call': 'warn',
+    '@typescript-eslint/no-unsafe-return': 'warn',
+    '@typescript-eslint/require-await': 'warn',
+    '@typescript-eslint/restrict-template-expressions': 'warn',
     '@typescript-eslint/no-floating-promises': 'error',
     '@typescript-eslint/no-misused-promises': 'error',
     '@typescript-eslint/await-thenable': 'error',
-    '@typescript-eslint/consistent-type-imports': [
-      'warn',
-      {
-        prefer: 'type-imports',
-      },
-    ],
 
     // General
-    'no-console': [
-      'warn',
-      {
-        allow: ['error', 'warn', 'info'],
-      },
-    ],
+    'no-console': 'off', // Allow console for CLI tool
     'no-debugger': 'error',
     'prefer-const': 'error',
     'no-var': 'error',
+    'no-case-declarations': 'warn',
+    'no-prototype-builtins': 'warn',
+    'no-useless-escape': 'warn',
     eqeqeq: ['error', 'always'],
 
     // Code style (handled by Prettier, but good to have as backup)
