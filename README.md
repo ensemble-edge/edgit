@@ -697,7 +697,7 @@ This project is in beta and follows semantic versioning with pre-1.0 conventions
 
 - 🐛 **Issues** - [Report bugs or request features](https://github.com/ensemble-edge/edgit/issues)
 - 💬 **Discussions** - [Community discussions and Q&A](https://github.com/ensemble-edge/edgit/discussions)
-- 📧 **Contact** - [hello@ensemble.dev](mailto:hello@ensemble.dev)
+- 📧 **Contact** - [hello@ensemble.ai](mailto:hello@ensemble.ai)
 
 ## License
 
