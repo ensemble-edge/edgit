@@ -7,6 +7,7 @@ import { AICommitManager } from '../utils/ai-commit.js'
 import type { ComponentRegistry, ComponentType } from '../models/components.js'
 import type { ComponentChange } from '../types/ai-commit.js'
 import { ComponentUtils } from '../models/components.js'
+import { createRegistryLoader } from '../utils/registry.js'
 
 /**
  * CommitCommand for Git tag-based system
@@ -112,12 +113,14 @@ export class CommitCommand extends Command {
         action: 'added' | 'modified' | 'deleted'
       }> = []
 
+      // Get status ONCE outside the loop to avoid O(n²) complexity
+      const status = await this.git.getStatus()
+
       // Check which staged files correspond to registered components
       for (const stagedFile of stagedFiles) {
         for (const { name, component } of componentEntries) {
           if (component.path === stagedFile) {
             // Determine action based on file status
-            const status = await this.git.getStatus()
             let action: 'added' | 'modified' | 'deleted' = 'modified'
 
             if (status.staged.includes(stagedFile)) {
@@ -305,7 +308,7 @@ export class CommitCommand extends Command {
   }
 
   /**
-   * Load components registry
+   * Load components registry using RegistryLoader utility
    */
   private async loadComponentsRegistry(): Promise<ComponentRegistry> {
     const repoRoot = await this.git.getRepoRoot()
@@ -313,21 +316,17 @@ export class CommitCommand extends Command {
       throw new Error('Not in a git repository')
     }
 
-    const componentsFile = path.join(
-      repoRoot,
-      CommitCommand.EDGIT_DIR,
-      CommitCommand.COMPONENTS_FILE
-    )
+    const loader = createRegistryLoader(repoRoot)
+    const result = await loader.load()
 
-    try {
-      const content = await fs.readFile(componentsFile, 'utf8')
-      return JSON.parse(content) as ComponentRegistry
-    } catch (error) {
-      if ((error as any).code === 'ENOENT') {
+    if (!result.ok) {
+      if (result.error.kind === 'not_initialized') {
         throw new Error('Edgit not initialized. Run "edgit init" first.')
       }
-      throw new Error(`Failed to load components registry: ${error}`)
+      throw new Error(result.error.message)
     }
+
+    return result.value
   }
 
   /**

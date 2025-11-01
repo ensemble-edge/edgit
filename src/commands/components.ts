@@ -6,6 +6,7 @@ import type { GitTagManager } from '../utils/git-tags.js'
 import { createGitTagManager } from '../utils/git-tags.js'
 import type { ComponentRegistry } from '../models/components.js'
 import { ComponentUtils, ComponentSpec, ComponentSpecParser } from '../models/components.js'
+import { createRegistryLoader } from '../utils/registry.js'
 
 /**
  * ComponentsCommand for Git tag-based component management
@@ -436,21 +437,17 @@ export class ComponentsCommand extends Command {
       throw new Error('Not in a git repository')
     }
 
-    const componentsFile = path.join(
-      repoRoot,
-      ComponentsCommand.EDGIT_DIR,
-      ComponentsCommand.COMPONENTS_FILE
-    )
+    const loader = createRegistryLoader(repoRoot)
+    const result = await loader.load()
 
-    try {
-      const content = await fs.readFile(componentsFile, 'utf8')
-      return JSON.parse(content) as ComponentRegistry
-    } catch (error) {
-      if ((error as any).code === 'ENOENT') {
+    if (!result.ok) {
+      if (result.error.kind === 'not_initialized') {
         throw new Error('Edgit not initialized. Run "edgit init" first.')
       }
-      throw new Error(`Failed to load components registry: ${error}`)
+      throw new Error(result.error.message)
     }
+
+    return result.value
   }
 
   private async saveComponentsRegistry(registry: ComponentRegistry): Promise<void> {
@@ -459,18 +456,12 @@ export class ComponentsCommand extends Command {
       throw new Error('Not in a git repository')
     }
 
-    const componentsFile = path.join(
-      repoRoot,
-      ComponentsCommand.EDGIT_DIR,
-      ComponentsCommand.COMPONENTS_FILE
-    )
+    const loader = createRegistryLoader(repoRoot)
+    const updatedRegistry = ComponentUtils.updateRegistry(registry)
+    const result = await loader.save(updatedRegistry)
 
-    try {
-      const updatedRegistry = ComponentUtils.updateRegistry(registry)
-      const content = JSON.stringify(updatedRegistry, null, 2)
-      await fs.writeFile(componentsFile, content, 'utf8')
-    } catch (error) {
-      throw new Error(`Failed to save components registry: ${error}`)
+    if (!result.ok) {
+      throw new Error(result.error.message)
     }
   }
 

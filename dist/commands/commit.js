@@ -4,6 +4,7 @@ import { Command } from './base.js';
 import { ComponentDetector } from '../utils/component-detector.js';
 import { AICommitManager } from '../utils/ai-commit.js';
 import { ComponentUtils } from '../models/components.js';
+import { createRegistryLoader } from '../utils/registry.js';
 /**
  * CommitCommand for Git tag-based system
  * Keeps AI commit features but removes version bumping logic
@@ -74,12 +75,13 @@ export class CommitCommand extends Command {
             const registry = await this.loadComponentsRegistry();
             const componentEntries = ComponentUtils.getAllComponents(registry);
             const changedComponents = [];
+            // Get status ONCE outside the loop to avoid O(n²) complexity
+            const status = await this.git.getStatus();
             // Check which staged files correspond to registered components
             for (const stagedFile of stagedFiles) {
                 for (const { name, component } of componentEntries) {
                     if (component.path === stagedFile) {
                         // Determine action based on file status
-                        const status = await this.git.getStatus();
                         let action = 'modified';
                         if (status.staged.includes(stagedFile)) {
                             // File is in staging - check if it's new or modified
@@ -228,24 +230,22 @@ export class CommitCommand extends Command {
         }
     }
     /**
-     * Load components registry
+     * Load components registry using RegistryLoader utility
      */
     async loadComponentsRegistry() {
         const repoRoot = await this.git.getRepoRoot();
         if (!repoRoot) {
             throw new Error('Not in a git repository');
         }
-        const componentsFile = path.join(repoRoot, CommitCommand.EDGIT_DIR, CommitCommand.COMPONENTS_FILE);
-        try {
-            const content = await fs.readFile(componentsFile, 'utf8');
-            return JSON.parse(content);
-        }
-        catch (error) {
-            if (error.code === 'ENOENT') {
+        const loader = createRegistryLoader(repoRoot);
+        const result = await loader.load();
+        if (!result.ok) {
+            if (result.error.kind === 'not_initialized') {
                 throw new Error('Edgit not initialized. Run "edgit init" first.');
             }
-            throw new Error(`Failed to load components registry: ${error}`);
+            throw new Error(result.error.message);
         }
+        return result.value;
     }
     /**
      * Get components file path

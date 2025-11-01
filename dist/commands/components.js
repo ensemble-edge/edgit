@@ -3,6 +3,7 @@ import * as path from 'path';
 import { Command } from './base.js';
 import { createGitTagManager } from '../utils/git-tags.js';
 import { ComponentUtils, ComponentSpecParser } from '../models/components.js';
+import { createRegistryLoader } from '../utils/registry.js';
 /**
  * ComponentsCommand for Git tag-based component management
  * Lists, shows, and manages components using Git tags for versioning
@@ -365,31 +366,26 @@ export class ComponentsCommand extends Command {
         if (!repoRoot) {
             throw new Error('Not in a git repository');
         }
-        const componentsFile = path.join(repoRoot, ComponentsCommand.EDGIT_DIR, ComponentsCommand.COMPONENTS_FILE);
-        try {
-            const content = await fs.readFile(componentsFile, 'utf8');
-            return JSON.parse(content);
-        }
-        catch (error) {
-            if (error.code === 'ENOENT') {
+        const loader = createRegistryLoader(repoRoot);
+        const result = await loader.load();
+        if (!result.ok) {
+            if (result.error.kind === 'not_initialized') {
                 throw new Error('Edgit not initialized. Run "edgit init" first.');
             }
-            throw new Error(`Failed to load components registry: ${error}`);
+            throw new Error(result.error.message);
         }
+        return result.value;
     }
     async saveComponentsRegistry(registry) {
         const repoRoot = await this.git.getRepoRoot();
         if (!repoRoot) {
             throw new Error('Not in a git repository');
         }
-        const componentsFile = path.join(repoRoot, ComponentsCommand.EDGIT_DIR, ComponentsCommand.COMPONENTS_FILE);
-        try {
-            const updatedRegistry = ComponentUtils.updateRegistry(registry);
-            const content = JSON.stringify(updatedRegistry, null, 2);
-            await fs.writeFile(componentsFile, content, 'utf8');
-        }
-        catch (error) {
-            throw new Error(`Failed to save components registry: ${error}`);
+        const loader = createRegistryLoader(repoRoot);
+        const updatedRegistry = ComponentUtils.updateRegistry(registry);
+        const result = await loader.save(updatedRegistry);
+        if (!result.ok) {
+            throw new Error(result.error.message);
         }
     }
     getHelp() {
