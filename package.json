@@ -35,8 +35,8 @@
     "versioning",
     "cli"
   ],
-  "author": "Ensemble Edge",
-  "license": "ISC",
+  "author": "Higher Order Capital",
+  "license": "MIT",
   "devDependencies": {
     "@changesets/cli": "^2.29.7",
     "@types/node": "^24.9.2",
