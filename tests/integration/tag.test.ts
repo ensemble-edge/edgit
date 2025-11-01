@@ -7,11 +7,13 @@ describe('edgit tag', () => {
   beforeEach(async () => {
     repo = await TestGitRepo.create()
     await repo.init()
-    await repo.runEdgit(['init'])
 
-    // Create a sample component
+    // Create a sample component BEFORE edgit init
     await repo.writeFile('prompts/test.prompt.md', 'Test prompt content')
     await repo.commit('Add test prompt')
+
+    // Now run edgit init to detect the component
+    await repo.runEdgit(['init'])
   })
 
   afterEach(async () => {

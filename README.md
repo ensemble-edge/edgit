@@ -8,7 +8,7 @@ npm install -g @ensemble-edge/edgit
 
 **Git tag-based component versioning for AI systems.** The multiverse already exists in your Git history - every version of every component lives in your commits. Edgit makes them accessible through native Git tags, eliminating merge conflicts while unlocking component independence.
 
-## Revolutionary Architecture: The Multiverse Made Visible
+## Novel Architecture: The Multiverse Made Visible
 
 ### The Hidden Truth About Your Repository
 
@@ -602,8 +602,83 @@ edgit tag create my-agent v2.0.0    # Version on main
 ## Documentation
 
 - 📖 **[Full Documentation](./docs/)** - Complete guides and API reference
-- 🚀 **[Getting Started](./docs/quickstart.mdx)** - Detailed setup and first steps  
+- 🚀 **[Getting Started](./docs/quickstart.mdx)** - Detailed setup and first steps
 - 💡 **[Examples](./examples/)** - Real-world usage patterns
+
+## Development & Contributing
+
+We welcome contributions! The project has comprehensive development infrastructure to ensure code quality and maintainability.
+
+### Development Setup
+
+```bash
+# Clone and install
+git clone https://github.com/ensemble-edge/edgit.git
+cd edgit
+npm install
+
+# Build
+npm run build
+
+# Run tests
+npm test
+
+# Run validation (types, lint, format, build, tests)
+npm run validate
+```
+
+### Documentation for Contributors
+
+- **[CLAUDE.md](./CLAUDE.md)** - Guidance for AI assistants working on the codebase
+- **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Complete developer setup and workflow guide
+- **[CONTRIBUTING.md](../CONTRIBUTING.md)** - Contribution guidelines and standards
+- **[TESTING.md](./TESTING.md)** - Testing strategy and patterns
+
+### Code Quality Tools
+
+The project uses modern development tools:
+
+- **TypeScript** - Strict mode enabled, no `any` types
+- **ESLint** - TypeScript-focused linting with strict rules
+- **Prettier** - Consistent code formatting
+- **Vitest** - Fast, modern testing framework
+- **VSCode Integration** - Settings and extensions configured
+
+### Testing
+
+```bash
+# Run all tests
+npm test
+
+# Watch mode
+npm run test:watch
+
+# Coverage report
+npm run test:coverage
+```
+
+**Test Coverage:**
+- 16 integration tests covering critical paths
+- TestGitRepo helper for isolated Git operations
+- Fixtures for all component types
+
+### Code Style
+
+- **Commits**: Follow [Conventional Commits](https://www.conventionalcommits.org/)
+- **Formatting**: 2 spaces, single quotes, no semicolons
+- **TypeScript**: Explicit return types, no `any`
+- **Documentation**: JSDoc comments for all public APIs
+
+### Contributing Workflow
+
+1. Fork and clone the repository
+2. Create a feature branch (`feature/your-feature`)
+3. Make changes following code standards
+4. Run `npm run validate` to verify
+5. Commit using conventional commit format
+6. Push and create a pull request
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for detailed guidelines.
 
 ## Versioning
 

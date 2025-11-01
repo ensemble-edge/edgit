@@ -130,6 +130,14 @@ export class TestGitRepo {
   }
 
   /**
+   * Get git log
+   */
+  async getLog(options: string = '--oneline -1'): Promise<string> {
+    const result = await this.exec(`git log ${options}`)
+    return result.stdout.trim()
+  }
+
+  /**
    * Run edgit command in this repository
    */
   async runEdgit(args: string[]): Promise<CommandResult> {

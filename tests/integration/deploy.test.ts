@@ -7,11 +7,15 @@ describe('edgit deploy', () => {
   beforeEach(async () => {
     repo = await TestGitRepo.create()
     await repo.init()
-    await repo.runEdgit(['init'])
 
-    // Create a component and version
+    // Create a component BEFORE edgit init
     await repo.writeFile('prompts/test.prompt.md', 'Test prompt')
     await repo.commit('Add prompt')
+
+    // Now run edgit init to detect the component
+    await repo.runEdgit(['init'])
+
+    // Create version tag
     await repo.runEdgit(['tag', 'create', 'test-prompt', 'v1.0.0'])
   })
 
