@@ -25,6 +25,7 @@ build/
 
 # Local planning and notes (not committed)
 .planning/todos/  # Personal task lists stay local
+.planning/todos/*
 .local/
 .dev-notes/
 
