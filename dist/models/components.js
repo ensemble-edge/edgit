@@ -60,7 +60,7 @@ export class ComponentUtils {
     static createComponent(filePath, type) {
         return {
             path: filePath,
-            type
+            type,
         };
     }
     /** Create empty registry */
@@ -68,14 +68,14 @@ export class ComponentUtils {
         return {
             version: '3.0.0', // New Git tag-based format
             components: {},
-            updated: new Date().toISOString()
+            updated: new Date().toISOString(),
         };
     }
     /** Update registry timestamp */
     static updateRegistry(registry) {
         return {
             ...registry,
-            updated: new Date().toISOString()
+            updated: new Date().toISOString(),
         };
     }
     /** Find component by name */

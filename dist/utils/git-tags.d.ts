@@ -1,4 +1,4 @@
-import { GitWrapper } from './git.js';
+import type { GitWrapper } from './git.js';
 /**
  * Git Tag Manager for Edgit component versioning and deployment
  * Handles namespaced component tags with separation between version and deployment tags

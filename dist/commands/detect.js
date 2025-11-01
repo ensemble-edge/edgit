@@ -56,7 +56,7 @@ Examples:
     extractDetectOptions(parsed) {
         return {
             output: parsed.options.output || 'detailed',
-            preview: parsed.flags.preview
+            preview: parsed.flags.preview,
         };
     }
     async analyzeFile(filePath, detector, options) {
@@ -64,7 +64,10 @@ Examples:
         const headerMetadata = await fileHeaderManager.readMetadata(filePath);
         const isRegistered = await this.isFileRegistered(filePath);
         let confidence = 'none';
-        let patterns = { matched: [], reason: 'No patterns matched' };
+        let patterns = {
+            matched: [],
+            reason: 'No patterns matched',
+        };
         if (detected) {
             confidence = this.calculateConfidence(filePath, detected.type);
             patterns = this.getMatchedPatterns(filePath, detector);
@@ -78,14 +81,16 @@ Examples:
             confidence,
             registered: isRegistered,
             hasHeader: !!headerMetadata,
-            headerMetadata: headerMetadata ? {
-                version: headerMetadata.version,
-                component: headerMetadata.component
-            } : undefined,
+            headerMetadata: headerMetadata
+                ? {
+                    version: headerMetadata.version,
+                    component: headerMetadata.component,
+                }
+                : undefined,
             suggestedName,
             suggestedVersion,
             patterns,
-            recommendations
+            recommendations,
         };
         if (options.preview && detected) {
             result.preview = await this.generatePreview(filePath, detected, suggestedName, suggestedVersion);
@@ -116,14 +121,14 @@ Examples:
             prompt: [/prompt/, /instruction/, /system/, /template/],
             agent: [/agent/, /assistant/, /bot/, /workflow/],
             sql: [/query/, /schema/, /migration/, /view/, /procedure/],
-            config: [/config/, /settings/, /env/, /props/]
+            config: [/config/, /settings/, /env/, /props/],
         };
         // Medium confidence indicators
         const mediumConfidencePatterns = {
             prompt: [/\.md$/, /readme/, /doc/, /prompts/],
             agent: [/\.py$/, /\.js$/, /\.ts$/, /agents/, /scripts/],
             sql: [/\.sql$/, /queries/, /database/],
-            config: [/\.json$/, /\.yaml$/, /\.yml$/, /configs?/]
+            config: [/\.json$/, /\.yaml$/, /\.yml$/, /configs?/],
         };
         // Check high confidence patterns
         const highPatterns = highConfidencePatterns[type];
@@ -160,26 +165,23 @@ Examples:
         }
         return {
             matched,
-            reason: `Matched ${matched.length} pattern(s)`
+            reason: `Matched ${matched.length} pattern(s)`,
         };
     }
     testPattern(file, pattern) {
         // Simple minimatch-like pattern testing
-        const regex = pattern
-            .replace(/\./g, '\\.')
-            .replace(/\*/g, '.*')
-            .replace(/\?/g, '.');
+        const regex = pattern.replace(/\./g, '\\.').replace(/\*/g, '.*').replace(/\?/g, '.');
         return new RegExp(`^${regex}$`).test(file);
     }
     suggestComponentName(filePath) {
         const basename = path.basename(filePath, path.extname(filePath));
-        return basename
+        return (basename
             .replace(/^(prompt|agent|config|query)[-_]?/i, '')
             .replace(/[-_](prompt|agent|config|query)$/i, '')
             .replace(/[^a-zA-Z0-9-_]/g, '-')
             .replace(/-+/g, '-')
             .replace(/^-|-$/g, '')
-            .toLowerCase() || 'component';
+            .toLowerCase() || 'component');
     }
     suggestInitialVersion(filePath, headerMetadata) {
         if (headerMetadata?.version) {
@@ -234,18 +236,20 @@ Examples:
             type: detected.type,
             path: filePath,
             version: suggestedVersion,
-            versionHistory: [{
+            versionHistory: [
+                {
                     version: suggestedVersion,
                     commit: 'initial',
                     timestamp: new Date().toISOString(),
-                    message: 'Initial component registration'
-                }]
+                    message: 'Initial component registration',
+                },
+            ],
         };
         // Generate header content preview
         const headerContent = await this.generateHeaderPreview(filePath, suggestedName, suggestedVersion);
         return {
             registryEntry,
-            headerContent
+            headerContent,
         };
     }
     async generateHeaderPreview(filePath, name, version) {
@@ -257,7 +261,7 @@ Examples:
             await fs.writeFile(tempFile, content);
             await fileHeaderManager.writeMetadata(tempFile, {
                 version,
-                component: name
+                component: name,
             });
             const previewContent = await fs.readFile(tempFile, 'utf8');
             await fs.unlink(tempFile); // Cleanup

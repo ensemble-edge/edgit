@@ -1,1 +1,1 @@
-{"version":3,"file":"resync.d.ts","sourceRoot":"","sources":["../../src/commands/resync.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,OAAO,EAAE,MAAM,WAAW,CAAC;AAEpC;;;GAGG;AACH,qBAAa,aAAc,SAAQ,OAAO;IAClC,OAAO,CAAC,IAAI,EAAE,MAAM,EAAE,GAAG,OAAO,CAAC,IAAI,CAAC;IAgB5C,OAAO,IAAI,MAAM;CAmBlB"}
+{"version":3,"file":"resync.d.ts","sourceRoot":"","sources":["../../src/commands/resync.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,OAAO,EAAE,MAAM,WAAW,CAAA;AAEnC;;;GAGG;AACH,qBAAa,aAAc,SAAQ,OAAO;IAClC,OAAO,CAAC,IAAI,EAAE,MAAM,EAAE,GAAG,OAAO,CAAC,IAAI,CAAC;IAgB5C,OAAO,IAAI,MAAM;CAmBlB"}

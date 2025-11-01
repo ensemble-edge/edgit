@@ -55,7 +55,7 @@ export class ChangelogManager {
             deprecated: [],
             removed: [],
             fixed: [],
-            security: []
+            security: [],
         };
         for (const change of versionChanges) {
             const description = this.createChangeDescription(change, aiGeneratedEntries);
@@ -84,7 +84,7 @@ export class ChangelogManager {
         return {
             version,
             date: today,
-            changes
+            changes,
         };
     }
     /**
@@ -106,11 +106,16 @@ export class ChangelogManager {
     }
     getActionDescription(action) {
         switch (action) {
-            case 'created': return 'Added new component';
-            case 'updated': return 'Updated component';
-            case 'renamed': return 'Renamed component';
-            case 'deleted': return 'Removed component';
-            default: return 'Modified component';
+            case 'created':
+                return 'Added new component';
+            case 'updated':
+                return 'Updated component';
+            case 'renamed':
+                return 'Renamed component';
+            case 'deleted':
+                return 'Removed component';
+            default:
+                return 'Modified component';
         }
     }
     /**
@@ -120,7 +125,7 @@ export class ChangelogManager {
         if (!message)
             return false;
         const fixKeywords = ['fix:', 'bugfix:', 'patch:', 'hotfix:', 'correct:'];
-        return fixKeywords.some(keyword => message.toLowerCase().includes(keyword));
+        return fixKeywords.some((keyword) => message.toLowerCase().includes(keyword));
     }
     /**
      * Determine release version from component changes
@@ -162,7 +167,7 @@ export class ChangelogManager {
             { key: 'deprecated', title: 'Deprecated' },
             { key: 'removed', title: 'Removed' },
             { key: 'fixed', title: 'Fixed' },
-            { key: 'security', title: 'Security' }
+            { key: 'security', title: 'Security' },
         ];
         for (const section of sections) {
             const items = entry.changes[section.key];

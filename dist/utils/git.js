@@ -42,7 +42,7 @@ export class GitWrapper {
         catch (error) {
             return {
                 installed: false,
-                error: error instanceof Error ? error.message : 'Git not found in PATH'
+                error: error instanceof Error ? error.message : 'Git not found in PATH',
             };
         }
     }
@@ -69,14 +69,14 @@ export class GitWrapper {
                 resolve({
                     stdout: stdout.trim(),
                     stderr: stderr.trim(),
-                    exitCode: exitCode || 0
+                    exitCode: exitCode || 0,
                 });
             });
             childProcess.on('error', (error) => {
                 resolve({
                     stdout: '',
                     stderr: error.message,
-                    exitCode: 1
+                    exitCode: 1,
                 });
             });
         });
@@ -121,7 +121,7 @@ export class GitWrapper {
         const unstaged = [];
         const untracked = [];
         if (result.exitCode === 0) {
-            const lines = result.stdout.split('\n').filter(line => line.trim());
+            const lines = result.stdout.split('\n').filter((line) => line.trim());
             for (const line of lines) {
                 const status = line.substring(0, 2);
                 const filePath = line.substring(3);
@@ -156,7 +156,7 @@ export class GitWrapper {
         }
         const result = await this.exec(args);
         if (result.exitCode === 0) {
-            return result.stdout.split('\n').filter(line => line.trim());
+            return result.stdout.split('\n').filter((line) => line.trim());
         }
         return [];
     }
@@ -171,12 +171,7 @@ export class GitWrapper {
      * Get commit information
      */
     async getCommitInfo(commitHash) {
-        const result = await this.exec([
-            'show',
-            '--format=%H%n%s%n%an%n%ai',
-            '--no-patch',
-            commitHash
-        ]);
+        const result = await this.exec(['show', '--format=%H%n%s%n%an%n%ai', '--no-patch', commitHash]);
         if (result.exitCode === 0) {
             const lines = result.stdout.split('\n');
             if (lines.length >= 4 && lines[0] && lines[1] && lines[2] && lines[3]) {
@@ -184,7 +179,7 @@ export class GitWrapper {
                     hash: lines[0],
                     message: lines[1],
                     author: lines[2],
-                    date: lines[3]
+                    date: lines[3],
                 };
             }
         }
@@ -222,7 +217,7 @@ export class GitWrapper {
         return new Promise((resolve, reject) => {
             const childProcess = spawn('git', args, {
                 stdio: 'inherit', // Pass through all I/O
-                cwd: process.cwd()
+                cwd: process.cwd(),
             });
             childProcess.on('close', (exitCode) => {
                 if (exitCode === 0) {
@@ -243,9 +238,7 @@ export class GitWrapper {
      */
     async isClean() {
         const status = await this.getStatus();
-        return status.staged.length === 0 &&
-            status.unstaged.length === 0 &&
-            status.untracked.length === 0;
+        return (status.staged.length === 0 && status.unstaged.length === 0 && status.untracked.length === 0);
     }
     /**
      * Add files to git staging area
@@ -297,7 +290,10 @@ export class GitWrapper {
         try {
             const result = await this.exec(['log', '--oneline', `-${count}`]);
             if (result.exitCode === 0) {
-                return result.stdout.trim().split('\n').filter(line => line.length > 0);
+                return result.stdout
+                    .trim()
+                    .split('\n')
+                    .filter((line) => line.length > 0);
             }
             return [];
         }
@@ -312,7 +308,10 @@ export class GitWrapper {
         try {
             const result = await this.exec(['diff', '--cached', '--name-only']);
             if (result.exitCode === 0) {
-                return result.stdout.trim().split('\n').filter(line => line.length > 0);
+                return result.stdout
+                    .trim()
+                    .split('\n')
+                    .filter((line) => line.length > 0);
             }
             return [];
         }

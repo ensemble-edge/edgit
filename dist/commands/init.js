@@ -34,7 +34,7 @@ export class InitCommand extends Command {
             const edgitDir = path.join(repoRoot, InitCommand.EDGIT_DIR);
             const componentsFile = path.join(edgitDir, InitCommand.COMPONENTS_FILE);
             // Check if already initialized
-            if (!force && await this.isAlreadyInitialized(componentsFile)) {
+            if (!force && (await this.isAlreadyInitialized(componentsFile))) {
                 this.showWarning('Edgit is already initialized in this repository.');
                 console.log('Use --force to reinitialize and rescan components.');
                 return;
@@ -46,12 +46,12 @@ export class InitCommand extends Command {
             let components = [];
             if (scan) {
                 components = await this.scanExistingComponents(repoRoot, {
-                    headers: headers || false
+                    headers: headers || false,
                 });
             }
             // Step 3: Create components.json
             await this.createComponentsRegistry(componentsFile, components, {
-                headers: headers || false
+                headers: headers || false,
             });
             // Step 4: Update .gitignore (optional)
             await this.updateGitignore(repoRoot, flags.gitignore !== false);
@@ -66,7 +66,7 @@ export class InitCommand extends Command {
             this.showError(`Failed to initialize edgit: ${message}`, [
                 'Ensure you are in a git repository',
                 'Check that you have write permissions',
-                'Try running with --force to overwrite existing setup'
+                'Try running with --force to overwrite existing setup',
             ]);
             throw error;
         }
@@ -163,10 +163,10 @@ export class InitCommand extends Command {
                 // Add header with default version (actual versions managed via Git tags)
                 await fileHeaderManager.writeMetadata(filePath, {
                     version: '1.0.0', // Default version for new components
-                    component: componentName
+                    component: componentName,
                 }, {
                     componentType: component.type,
-                    replace: false
+                    replace: false,
                 });
                 this.showInfo(`Added header to ${component.path}`);
             }
@@ -254,7 +254,10 @@ export class InitCommand extends Command {
         const envPath = path.join(repoRoot, '.env');
         try {
             // Check if .env already exists
-            const envExists = await fs.access(envPath).then(() => true).catch(() => false);
+            const envExists = await fs
+                .access(envPath)
+                .then(() => true)
+                .catch(() => false);
             if (!envExists) {
                 // Create .env template with AI configuration
                 const envTemplate = `# Edgit AI Configuration
@@ -291,7 +294,7 @@ OPENAI_API_KEY=your_openai_api_key_here
             }
             // Check if pattern already exists
             const lines = gitignoreContent.split('\n');
-            const patternExists = lines.some(line => line.trim() === pattern);
+            const patternExists = lines.some((line) => line.trim() === pattern);
             if (!patternExists) {
                 // Add pattern to .gitignore
                 const newContent = gitignoreContent.trim() + (gitignoreContent.trim() ? '\n' : '') + pattern + '\n';

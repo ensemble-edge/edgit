@@ -42,7 +42,7 @@ export class ScanCommand extends Command {
             type: parsed.options.type,
             withHeaders: parsed.flags['with-headers'],
             trackedOnly: parsed.flags['tracked-only'],
-            output: parsed.options.output || 'table'
+            output: parsed.options.output || 'table',
         };
     }
     async getFilesToScan(options) {
@@ -64,12 +64,9 @@ export class ScanCommand extends Command {
     async findFilesByPattern(pattern) {
         // Simple glob-like pattern matching
         const files = await this.findTrackedFiles();
-        return files.filter(file => {
+        return files.filter((file) => {
             // Convert glob pattern to regex
-            const regex = pattern
-                .replace(/\./g, '\\.')
-                .replace(/\*/g, '.*')
-                .replace(/\?/g, '.');
+            const regex = pattern.replace(/\./g, '\\.').replace(/\*/g, '.*').replace(/\?/g, '.');
             return new RegExp(regex).test(file);
         });
     }
@@ -122,7 +119,7 @@ export class ScanCommand extends Command {
                 registered: isRegistered,
                 hasHeader,
                 headerVersion: headerMetadata?.version,
-                suggested
+                suggested,
             };
         }
         catch (error) {
@@ -177,14 +174,14 @@ Examples:
             prompt: [/prompt/, /instruction/, /system/, /template/],
             agent: [/agent/, /assistant/, /bot/, /workflow/],
             sql: [/query/, /schema/, /migration/, /view/, /procedure/],
-            config: [/config/, /settings/, /env/, /props/]
+            config: [/config/, /settings/, /env/, /props/],
         };
         // Medium confidence indicators
         const mediumConfidencePatterns = {
             prompt: [/\.md$/, /readme/, /doc/],
             agent: [/\.py$/, /\.js$/, /\.ts$/],
             sql: [/\.sql$/],
-            config: [/\.json$/, /\.yaml$/, /\.yml$/]
+            config: [/\.json$/, /\.yaml$/, /\.yml$/],
         };
         // Check high confidence patterns
         if (highConfidencePatterns[type]) {
@@ -207,13 +204,13 @@ Examples:
     suggestComponentName(file) {
         const basename = path.basename(file, path.extname(file));
         // Clean up common patterns
-        return basename
+        return (basename
             .replace(/^(prompt|agent|config|query)[-_]?/i, '')
             .replace(/[-_](prompt|agent|config|query)$/i, '')
             .replace(/[^a-zA-Z0-9-_]/g, '-')
             .replace(/-+/g, '-')
             .replace(/^-|-$/g, '')
-            .toLowerCase() || 'component';
+            .toLowerCase() || 'component');
     }
     async outputResults(results, options) {
         if (options.output === 'json') {
@@ -233,31 +230,47 @@ Examples:
             return;
         }
         console.log('Found potential components:\n');
-        const maxFileLength = Math.max(4, ...results.map(r => r.file.length));
-        const maxTypeLength = Math.max(4, ...results.map(r => r.type.length));
+        const maxFileLength = Math.max(4, ...results.map((r) => r.file.length));
+        const maxTypeLength = Math.max(4, ...results.map((r) => r.type.length));
         // Header
         console.log('  ' +
-            'File'.padEnd(maxFileLength) + '  ' +
-            'Type'.padEnd(maxTypeLength) + '  ' +
-            'Confidence'.padEnd(10) + '  ' +
-            'Status'.padEnd(12) + '  ' +
+            'File'.padEnd(maxFileLength) +
+            '  ' +
+            'Type'.padEnd(maxTypeLength) +
+            '  ' +
+            'Confidence'.padEnd(10) +
+            '  ' +
+            'Status'.padEnd(12) +
+            '  ' +
             'Suggested Name');
         console.log('  ' +
-            '-'.repeat(maxFileLength) + '  ' +
-            '-'.repeat(maxTypeLength) + '  ' +
-            '-'.repeat(10) + '  ' +
-            '-'.repeat(12) + '  ' +
+            '-'.repeat(maxFileLength) +
+            '  ' +
+            '-'.repeat(maxTypeLength) +
+            '  ' +
+            '-'.repeat(10) +
+            '  ' +
+            '-'.repeat(12) +
+            '  ' +
             '-'.repeat(14));
         // Results
         for (const result of results) {
             const statusIcon = result.registered ? '✓ ' : result.hasHeader ? '📄 ' : '  ';
-            const statusText = result.registered ? 'Registered' : result.hasHeader ? 'Has Header' : 'Untracked';
+            const statusText = result.registered
+                ? 'Registered'
+                : result.hasHeader
+                    ? 'Has Header'
+                    : 'Untracked';
             const confidenceIcon = result.confidence === 'high' ? '🔥' : result.confidence === 'medium' ? '⚡' : '💡';
             console.log(statusIcon +
-                result.file.padEnd(maxFileLength) + '  ' +
-                result.type.padEnd(maxTypeLength) + '  ' +
-                (confidenceIcon + ' ' + result.confidence).padEnd(10) + '  ' +
-                statusText.padEnd(12) + '  ' +
+                result.file.padEnd(maxFileLength) +
+                '  ' +
+                result.type.padEnd(maxTypeLength) +
+                '  ' +
+                (confidenceIcon + ' ' + result.confidence).padEnd(10) +
+                '  ' +
+                statusText.padEnd(12) +
+                '  ' +
                 (result.suggested || ''));
         }
         console.log('\nLegend:');

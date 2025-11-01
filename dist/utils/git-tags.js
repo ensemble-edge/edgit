@@ -18,14 +18,7 @@ export class GitTagManager {
         const gitTag = `components/${component}/${tagName}`;
         const target = sha || 'HEAD';
         const tagMessage = message || `Tag ${component} as ${tagName}`;
-        const result = await this.git.exec([
-            'tag',
-            '-a',
-            gitTag,
-            target,
-            '-m',
-            tagMessage
-        ]);
+        const result = await this.git.exec(['tag', '-a', gitTag, target, '-m', tagMessage]);
         if (result.exitCode !== 0) {
             throw new Error(`Failed to create tag ${gitTag}: ${result.stderr}`);
         }
@@ -43,8 +36,8 @@ export class GitTagManager {
         }
         return result.stdout
             .split('\n')
-            .filter(line => line.trim())
-            .map(tag => tag.replace(`components/${component}/`, ''));
+            .filter((line) => line.trim())
+            .map((tag) => tag.replace(`components/${component}/`, ''));
     }
     /**
      * Get the SHA that a tag points to
@@ -89,15 +82,7 @@ export class GitTagManager {
         const gitTag = `components/${component}/${env}`;
         const tagMessage = message || `Deploy ${component} to ${env}`;
         // Force update deployment tag
-        const result = await this.git.exec([
-            'tag',
-            '-f',
-            '-a',
-            gitTag,
-            targetSHA,
-            '-m',
-            tagMessage
-        ]);
+        const result = await this.git.exec(['tag', '-f', '-a', gitTag, targetSHA, '-m', tagMessage]);
         if (result.exitCode !== 0) {
             throw new Error(`Failed to move deployment tag ${gitTag}: ${result.stderr}`);
         }
@@ -160,7 +145,7 @@ export class GitTagManager {
         const result = await this.git.exec([
             'for-each-ref',
             '--format=%(objectname)|%(authordate:iso)|%(contents:subject)|%(authorname)',
-            `refs/tags/${gitTag}`
+            `refs/tags/${gitTag}`,
         ]);
         if (result.exitCode !== 0 || !result.stdout.trim()) {
             throw new Error(`Tag not found: ${gitTag}`);
@@ -175,7 +160,7 @@ export class GitTagManager {
             sha: sha || '',
             date: date || '',
             message: message || '',
-            author: author || ''
+            author: author || '',
         };
     }
     /**
@@ -185,11 +170,17 @@ export class GitTagManager {
      */
     async getVersionTags(component) {
         const tags = await this.listComponentTags(component);
-        const versionTags = tags.filter(tag => tag.match(/^v?\d+\.\d+\.\d+/));
+        const versionTags = tags.filter((tag) => tag.match(/^v?\d+\.\d+\.\d+/));
         // Sort version tags semantically
         return versionTags.sort((a, b) => {
-            const aVersion = a.replace(/^v/, '').split('.').map(n => parseInt(n, 10));
-            const bVersion = b.replace(/^v/, '').split('.').map(n => parseInt(n, 10));
+            const aVersion = a
+                .replace(/^v/, '')
+                .split('.')
+                .map((n) => parseInt(n, 10));
+            const bVersion = b
+                .replace(/^v/, '')
+                .split('.')
+                .map((n) => parseInt(n, 10));
             for (let i = 0; i < Math.min(aVersion.length, bVersion.length); i++) {
                 const aNum = aVersion[i] || 0;
                 const bNum = bVersion[i] || 0;
@@ -208,7 +199,7 @@ export class GitTagManager {
     async getDeploymentTags(component) {
         const tags = await this.listComponentTags(component);
         const deploymentTags = ['prod', 'staging', 'canary', 'latest', 'dev'];
-        return tags.filter(tag => deploymentTags.includes(tag));
+        return tags.filter((tag) => deploymentTags.includes(tag));
     }
     /**
      * Push component tags to remote
@@ -217,7 +208,7 @@ export class GitTagManager {
      * @param force Whether to force push (for deployment tags)
      */
     async pushTags(component, tagNames, force = false) {
-        const tags = tagNames || await this.listComponentTags(component);
+        const tags = tagNames || (await this.listComponentTags(component));
         const forceFlag = force ? '--force' : '';
         for (const tagName of tags) {
             const gitTag = `components/${component}/${tagName}`;
@@ -246,11 +237,7 @@ export class GitTagManager {
         }
         // Delete remote tag if requested
         if (deleteRemote) {
-            const pushResult = await this.git.exec([
-                'push',
-                'origin',
-                `:refs/tags/${gitTag}`
-            ]);
+            const pushResult = await this.git.exec(['push', 'origin', `:refs/tags/${gitTag}`]);
             if (pushResult.exitCode !== 0) {
                 console.warn(`Warning: Failed to delete remote tag ${gitTag}: ${pushResult.stderr}`);
             }

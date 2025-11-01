@@ -63,7 +63,7 @@ Examples:
             pattern: parsed.options.pattern,
             description: parsed.options.description,
             force: parsed.flags.force,
-            test: parsed.options.test
+            test: parsed.options.test,
         };
     }
     async listPatterns(options) {
@@ -126,7 +126,7 @@ Examples:
             pattern: patternGlob,
             description,
             confidence: 0.8, // Custom patterns get high confidence
-            isCustom: true
+            isCustom: true,
         };
         await this.saveCustomPattern(newPattern);
         this.showSuccess(`Added new ${type} pattern: ${patternGlob}`);
@@ -147,7 +147,7 @@ Examples:
             return;
         }
         const customPatterns = await this.loadCustomPatterns();
-        const patternIndex = customPatterns.findIndex(p => p.id === patternId);
+        const patternIndex = customPatterns.findIndex((p) => p.id === patternId);
         if (patternIndex === -1) {
             this.showError(`Pattern not found: ${patternId}`);
             console.log('Use "edgit discover patterns list" to see available patterns.');
