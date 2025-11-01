@@ -1,6 +1,6 @@
 # @ensemble-edge/edgit
 
-## 0.1.0
+## 0.1.8
 
 ### Minor Changes
 
