@@ -29,7 +29,7 @@ export declare class CommitCommand extends Command {
      */
     private isEdgitInitialized;
     /**
-     * Load components registry
+     * Load components registry using RegistryLoader utility
      */
     private loadComponentsRegistry;
     /**
