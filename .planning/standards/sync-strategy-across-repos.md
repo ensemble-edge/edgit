@@ -22,14 +22,13 @@ Maintain consistency across public-facing repositories while respecting:
 ### File Categories to Synchronize
 
 #### 1. Planning & Standards
-Organizational planning and standards documents:
-- `.planning/standards/` - Engineering and operational standards
-  - `code-review.md` - Code review process
-  - `architecture.md` - Architecture principles
-  - `security.md` - Security standards
-  - `documentation.md` - Documentation requirements
-  - `release.md` - Release process
-  - `testing.md` - Testing requirements
+Organizational planning and standards documents in `.planning/standards/`:
+  - `README.md` - Index of standards
+  - `code-review-standard.md` - Code review process
+  - `docs-authoring-standards.md` - Documentation requirements
+  - `sync-strategy-across-repos.md` - This document
+
+**Note**: Keep planning standards minimal - only standards that exist and are actively used. `TESTING.md` lives in repository root, not duplicated in `.planning/standards/`. Additional standards (architecture, security, release) can be added as needed when the organization matures.
 
 #### 2. Community Standards
 Files that define how people interact with the project:
@@ -91,6 +90,8 @@ Include in appropriate locations (README files, documentation, website footers):
 Ensemble® is a registered trademark of Higinio O. Maycotte.
 ```
 
+**Important**: The trademark owner is **Higinio O. Maycotte**, not Higher Order Capital.
+
 ### License Headers
 
 **MIT Licensed Files** (edgit, docs, examples):
@@ -118,7 +119,7 @@ Ensemble Conductor
 Copyright 2024-2025 Higher Order Capital
 
 This product includes software developed at Higher Order Capital.
-Ensemble® is a registered trademark of Higher Order Capital.
+Ensemble® is a registered trademark of Higinio O. Maycotte.
 ```
 
 ### README Trademark Section
@@ -130,15 +131,50 @@ Include in all public repository READMEs:
 
 ## Trademark
 
-Ensemble® is a registered trademark of Higher Order Capital.
+Ensemble® is a registered trademark of Higinio O. Maycotte.
 ```
+
+## Contact Information
+
+### Official Domain
+All email addresses and documentation URLs must use **ensemble.ai** (not ensemble.dev or other domains):
+- Support: `hello@ensemble.ai`
+- Security: `security@ensemble.ai`
+- Documentation: `https://docs.ensemble.ai`
 
 ## Synchronization Approach
 
+### Baseline Strategy: Edgit as Source of Truth
+
+**Edgit** serves as the baseline repository for all sync operations:
+1. Edgit is the most mature and complete repository
+2. All community standards, dev docs, and configs originate from edgit
+3. Other repos sync from edgit with appropriate customizations
+
+### Sync Levels by Repository
+
+#### Full Sync: Conductor
+Conductor receives full synchronization from edgit:
+- All community standards (CODE_OF_CONDUCT, CONTRIBUTING, SECURITY, SUPPORT)
+- All development docs (CLAUDE.md, DEVELOPMENT.md, TESTING.md)
+- All dev configs (.editorconfig, commitlint.config.js, .github templates)
+- License changed to Apache 2.0 + NOTICE file (vs MIT in edgit)
+- Content customized for conductor (agent orchestration vs component versioning)
+
+#### Simplified Sync: Docs & Examples
+Docs and examples repos receive essential files only:
+- LICENSE (MIT)
+- COPYRIGHT
+- SUPPORT.md (tailored to docs/examples context)
+- CONTRIBUTING.md (simplified for docs/examples contributions)
+- .editorconfig (for consistent editing)
+
 ### 1. Master Repository
-Use `ensemble-edge/.github` as source of truth for:
-- Organizational defaults (automatically applied by GitHub)
-- `.planning/standards/` directory (must be manually synced)
+Use **edgit** as source of truth for:
+- All community standards files
+- Development documentation structure
+- Configuration templates
+- `.planning/standards/` directory (must be manually synced to conductor)
 - Copyright and trademark templates
 
 ### 2. Planning Standards Directory
@@ -147,25 +183,109 @@ Structure for `.planning/standards/`:
 ```
 .planning/
 └── standards/
-    ├── README.md              # Index of standards
-    ├── code-review.md         # Code review process
-    ├── architecture.md        # Architecture principles
-    ├── security.md           # Security requirements
-    ├── documentation.md      # Documentation standards
-    ├── release.md            # Release process
-    └── testing.md            # Testing requirements
+    ├── README.md                      # Index of standards
+    ├── code-review-standard.md        # Code review process
+    ├── docs-authoring-standards.md    # Documentation standards
+    └── sync-strategy-across-repos.md  # This document
 ```
 
 These documents should be:
-- Identical across all repositories
-- Updated only in master repository
-- Synced via automated workflow
+- Present in edgit (source of truth)
+- Copied to conductor during sync
+- Not needed in docs/examples (documentation-only repos)
+- Updated only in edgit, then synced
 - Reviewed quarterly by engineering leadership
 
-### 3. Override Strategy
+### 3. Step-by-Step Sync Process
+
+When synchronizing repositories from edgit:
+
+#### Step 1: Update Legal Files
+```bash
+# In edgit (baseline):
+1. Update LICENSE copyright year if needed
+2. Update COPYRIGHT file
+3. Update trademark notices in README.md
+
+# Sync to conductor:
+1. Copy COPYRIGHT file
+2. Replace LICENSE with Apache 2.0 version
+3. Create/update NOTICE file with Apache 2.0 requirements
+4. Update package.json (license: "Apache-2.0", author: "Higher Order Capital")
+
+# Sync to docs/examples:
+1. Copy COPYRIGHT file
+2. Copy MIT LICENSE from edgit
+3. No NOTICE file needed (MIT doesn't require it)
+```
+
+#### Step 2: Sync Community Standards
+```bash
+# Full sync to conductor:
+- Copy CODE_OF_CONDUCT.md as-is
+- Copy SECURITY.md as-is
+- Customize CONTRIBUTING.md for conductor specifics
+- Customize SUPPORT.md (change edgit URLs to conductor URLs)
+
+# Simplified sync to docs/examples:
+- Copy SUPPORT.md and customize for docs/examples context
+- Create simplified CONTRIBUTING.md for docs/examples contributions
+- CODE_OF_CONDUCT.md and SECURITY.md optional (can reference main repo)
+```
+
+#### Step 3: Sync Development Documentation
+```bash
+# Full sync to conductor:
+- Customize CLAUDE.md (change from edgit CLI to conductor runtime)
+- Customize DEVELOPMENT.md (change from npm CLI to Cloudflare Workers)
+- Customize TESTING.md (change test scenarios for conductor)
+- Keep structure and standards identical, change content specifics
+
+# Docs/examples: Not applicable
+- These repos don't need dev docs
+```
+
+#### Step 4: Sync Development Configs
+```bash
+# Full sync to conductor:
+- Copy .editorconfig as-is
+- Copy commitlint.config.js as-is
+- Copy .github/PULL_REQUEST_TEMPLATE.md as-is
+- Copy .github/dependabot.yml as-is
+
+# Simplified sync to docs/examples:
+- Copy .editorconfig only
+- Other configs optional based on repo needs
+```
+
+#### Step 5: Fix Domain References
+```bash
+# All repos:
+1. Search for "ensemble.dev" or other wrong domains
+2. Replace with "ensemble.ai"
+3. Update all email addresses:
+   - hello@ensemble.ai (not .dev)
+   - security@ensemble.ai (not .dev)
+4. Update documentation URLs to docs.ensemble.ai
+```
+
+#### Step 6: Customize Product-Specific Content
+```bash
+# Conductor:
+- Replace all "edgit" references with "conductor"
+- Update from "component versioning" to "agent orchestration"
+- Change examples from Git tags to workflow execution
+- Update architecture from CLI tool to Cloudflare Workers runtime
+
+# Docs/examples:
+- Keep references appropriate to their purpose
+- Link to relevant product docs (edgit or conductor)
+```
+
+### 4. Override Strategy
 Each repo can override organizational defaults by creating local versions. Local files always take precedence except for `.planning/standards/` which should remain synchronized.
 
-### 4. License Handling
+### 5. License Handling
 ```
 MIT repos (edgit, docs, examples):
 - Standard MIT LICENSE file
@@ -181,7 +301,7 @@ Private repo (cloud):
 - Internal COPYRIGHT notice only
 ```
 
-### 5. NPX Package Considerations
+### 6. NPX Package Considerations
 
 For edgit and conductor:
 - Ensure `bin` field in package.json points to CLI entry
