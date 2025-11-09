@@ -178,6 +178,131 @@ Edge deployment makes this 100x more critical:
 - ⚡ **Native Git performance** - Zero overhead, pure Git operations
 - � **Immutable version history** - Git tags preserve all versions forever
 
+## Conductor Integration
+
+Edgit powers [Conductor](https://github.com/ensemble-edge/conductor)'s component loading system, enabling versioned templates, prompts, and configurations at the edge.
+
+### Templates in Conductor
+
+Deploy HTML, Email, and PDF templates with instant versioning:
+
+```yaml
+# ensemble.yaml
+members:
+  - name: send-welcome
+    type: Email
+    config:
+      # Load versioned template from Edgit
+      template: template://welcome-email@v1.0.0
+      data:
+        name: ${input.userName}
+        appName: "MyApp"
+```
+
+**Workflow:**
+```bash
+# Register template in Edgit
+edgit components add welcome-email templates/email/welcome.html template
+
+# Version it
+edgit tag create welcome-email v1.0.0
+
+# Deploy to Cloudflare KV (used by Conductor)
+edgit deploy set welcome-email v1.0.0 --to production
+
+# A/B test new version
+edgit tag create welcome-email v2.0.0
+# Use both: template://welcome-email@v1.0.0 and template://welcome-email@v2.0.0
+```
+
+### Prompts in Conductor
+
+Version AI prompts for Think members:
+
+```yaml
+# ensemble.yaml
+members:
+  - name: analyze-company
+    type: Think
+    config:
+      # Load versioned prompt from Edgit
+      prompt: prompt://company-analysis@v2.0.0
+      provider: anthropic
+      model: claude-3-5-sonnet-20241022
+      data:
+        company_name: ${input.companyName}
+        industry: ${input.industry}
+```
+
+**Workflow:**
+```bash
+# Register prompt in Edgit
+edgit components add company-analysis prompts/company-analysis.md prompt
+
+# Version it
+edgit tag create company-analysis v1.0.0
+
+# Deploy to edge
+edgit deploy set company-analysis v1.0.0 --to production
+
+# Iterate rapidly - update prompt without redeploying code
+edgit tag create company-analysis v1.1.0
+edgit deploy set company-analysis v1.1.0 --to production
+```
+
+### Why Edgit + Conductor?
+
+**Instant Updates at the Edge**
+- Update templates/prompts without rebuilding your application
+- Zero-downtime deployments - new versions load instantly
+- Components cached globally at Cloudflare edge (1-hour TTL default)
+
+**Multiverse Testing**
+- Run multiple template versions simultaneously (A/B testing)
+- Test prompt improvements in staging while prod uses stable version
+- Mix and match component versions freely
+
+**Component Independence**
+- Version templates separately from prompts and code
+- Update email template without touching API logic
+- Each component evolves at its own pace
+
+**Edge Performance**
+```typescript
+// Components loaded via ComponentLoader with edge caching
+const componentLoader = createComponentLoader({
+  kv: env.COMPONENTS,        // Cloudflare KV namespace
+  cache: repositoryCache,    // Edge cache (1 hour default)
+  logger: context.logger
+});
+
+// Load with custom cache settings
+const template = await componentLoader.load(
+  'template://welcome-email@v1.0.0',
+  { cache: { ttl: 86400 } }  // Cache for 24 hours
+);
+```
+
+### Component Protocols
+
+Conductor's ComponentLoader supports multiple protocols powered by Edgit:
+
+- `template://` - HTML/Email/PDF templates
+- `prompt://` - AI prompts for Think members
+- `query://` - SQL queries for Data members
+- `config://` - Configuration objects
+- `form://` - Form definitions (coming soon)
+- `page://` - Full page components (coming soon)
+
+All protocols use the same URI format: `{protocol}://{path}[@{version}]`
+
+### Learn More
+
+- **[Component Types Guide](../docs/edgit/guides/component-types.mdx)** - Templates and Prompts as first-class components
+- **[Conductor HTML Member](../docs/conductor/member-types/html.mdx)** - Using templates in HTML/Email/PDF generation
+- **[Component Caching](../docs/conductor/concepts/caching.mdx)** - Edge caching strategies for components
+- **[HTML Components Example](../docs/conductor/examples/html-components.mdx)** - Complete dashboard with versioned components
+
 ## Quick Start
 
 ```bash
