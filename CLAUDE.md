@@ -39,11 +39,15 @@ See [.planning/README.md](.planning/README.md) for full details.
 - `npm run prepublishOnly` - Build before publishing (runs automatically)
 
 ### Testing
-⚠️ **Current State**: No test framework configured yet
-- `npm test` - Currently just echoes "tests pass" (placeholder)
-- **TODO**: Jest/Vitest setup needed
-- **TODO**: Integration tests for Git operations
-- **TODO**: Unit tests for utilities
+✅ **Current State**: Vitest test framework configured with comprehensive test coverage
+- `npm test` - Run all tests (160 tests passing)
+- `npm run test:watch` - Run tests in watch mode
+- `npm run test:coverage` - Generate coverage report
+- **Test Categories**:
+  - Integration tests for Git operations (16 tests)
+  - Component detection tests (24 tests)
+  - Component listing tests with all formats (24 tests)
+  - Command parsing and execution tests (96+ tests)
 
 ### Code Quality
 ⚠️ **Current State**: No linting/formatting configured yet
@@ -155,17 +159,26 @@ edgit/
 │   │   ├── commit.ts           # AI-powered commits
 │   │   ├── tag.ts              # Tag management
 │   │   ├── deploy.ts           # Deployment operations
-│   │   ├── components.ts       # Component management
+│   │   ├── components.ts       # Component management & listing
+│   │   ├── discover.ts         # Discovery command group
+│   │   ├── scan.ts             # Scan for components
+│   │   ├── detect.ts           # Detect specific files
+│   │   ├── patterns.ts         # Manage detection patterns
 │   │   └── ...                 # Other commands
 │   ├── utils/                   # Core utilities
 │   │   ├── git.ts              # GitWrapper class
 │   │   ├── git-tags.ts         # Tag operations
 │   │   ├── component-detector.ts  # File pattern detection
+│   │   ├── component-resolver.ts  # Component reference resolution
 │   │   ├── ai-commit.ts        # OpenAI integration
 │   │   └── ...                 # Other utilities
 │   ├── models/                  # Type definitions
-│   │   └── components.ts       # Component types
+│   │   └── components.ts       # Component types & utilities
 │   └── types/                   # Additional types
+├── tests/                       # Test suite (Vitest)
+│   ├── integration/            # Integration tests
+│   ├── unit/                   # Unit tests
+│   └── helpers/                # Test utilities
 ├── dist/                        # Build output (JS, maps, declarations)
 ├── .edgit/                      # Edgit metadata (created by init)
 │   ├── components.json         # Component registry (path + type only)
@@ -341,6 +354,69 @@ Components are detected by file patterns:
 
 ## Common Tasks
 
+### Listing Components
+
+The `edgit components list` command provides powerful component overview capabilities:
+
+```bash
+# List all components with version info (table format)
+edgit components list
+
+# Different output formats
+edgit components list --format json    # JSON for scripting
+edgit components list --format yaml    # YAML for configs
+edgit components list --format tree    # Tree with deployment indicators
+
+# Filter components
+edgit components list --type prompt           # Only prompts
+edgit components list --tags-only             # Only components with version tags
+edgit components list --tracked               # Only registered components
+edgit components list --untracked             # Only unregistered component files
+
+# Limit versions shown
+edgit components list --limit 5               # Show max 5 versions per component
+
+# Combine filters
+edgit components list --type agent --tracked --format tree
+```
+
+**Implementation Details:**
+- Located in `src/commands/components.ts`
+- Supports 4 output formats: table (default), JSON, YAML, tree
+- Uses `ComponentUtils` for registry operations
+- Uses `ComponentDetector` for finding untracked components
+- Integrates with Git tag system to show version history
+- Shows deployment indicators in tree and table formats
+
+### Discovering Components
+
+The `edgit discover` command group helps find and analyze components:
+
+```bash
+# Scan repository for potential components
+edgit discover scan                           # Scan all files
+edgit discover scan --type prompt             # Find only prompts
+edgit discover scan --tracked-only            # Only git-tracked files
+edgit discover scan --pattern "*.md"          # Custom file pattern
+edgit discover scan --with-headers            # Only files with version headers
+
+# Analyze specific file
+edgit discover detect path/to/file.md         # Get component type, confidence
+
+# Manage detection patterns
+edgit discover patterns list                  # Show all patterns
+edgit discover patterns add prompt "*.txt"    # Add custom pattern
+edgit discover patterns remove sql "*.old"    # Remove pattern
+```
+
+**Implementation Details:**
+- Command group in `src/commands/discover.ts`
+- Scan implementation: `src/commands/scan.ts`
+- Detect implementation: `src/commands/detect.ts`
+- Patterns implementation: `src/commands/patterns.ts`
+- Uses `ComponentDetector` for file analysis
+- Supports both tracked and untracked file discovery
+
 ### Adding a New Command
 
 1. **Create command file**: `src/commands/my-command.ts`
@@ -430,64 +506,125 @@ if (!process.env.OPENAI_API_KEY) {
 ## Testing Strategy
 
 ### Current State
-⚠️ **No tests implemented yet**
+✅ **Comprehensive test coverage with Vitest** (160 tests passing)
 
-### Planned Approach
+### Test Structure
 
-1. **Test Framework**: Jest or Vitest
-2. **Test Structure**:
-   ```
-   tests/
-   ├── unit/
-   │   ├── utils/
-   │   └── models/
-   ├── integration/
-   │   └── commands/
-   ├── fixtures/
-   │   └── sample-repos/
-   └── helpers/
-       ├── git-test-repo.ts
-       └── mock-filesystem.ts
-   ```
+```
+tests/
+├── integration/
+│   ├── basic.test.ts                      # Core Git operations (16 tests)
+│   ├── components-list-enhanced.test.ts   # Component listing (24 tests)
+│   ├── component-detection.test.ts        # Detection patterns (24 tests)
+│   └── ...                                # Other integration tests
+├── unit/
+│   ├── component-resolver.test.ts         # Component resolution (29 tests)
+│   └── ...                                # Other unit tests
+└── helpers/
+    ├── TestGitRepo.ts                     # Test repository helper
+    └── fixtures/                          # Sample component files
+```
 
-3. **Key Test Areas**:
-   - Git operations (mocked)
+### Test Coverage Areas
+
+1. **Git Operations** (16 tests)
+   - Repository initialization
+   - Tag creation and management
    - Component detection
-   - Tag creation/management
-   - Command parsing
+   - Git command execution
+
+2. **Component Listing** (24 tests)
+   - All output formats (table, JSON, YAML, tree)
+   - Filtering (type, tags-only, tracked, untracked)
+   - Version limiting
+   - Deployment indicators
+   - Edge cases (empty, no tags, etc.)
+
+3. **Component Detection** (24 tests)
+   - Pattern matching for all component types
+   - Confidence scoring
+   - Name generation
+   - Collision detection
+
+4. **Component Resolution** (29 tests)
+   - URI parsing (prompt://, template://, etc.)
+   - Version resolution
+   - Deployment tag resolution
    - Error handling
 
-4. **Test Utilities Needed**:
-   - Mock Git wrapper
-   - Temporary repo creation
-   - Fixture components
-   - Snapshot testing for output
+5. **Command Execution** (67+ tests)
+   - Argument parsing
+   - Option handling
+   - Error cases
+   - Help text generation
+
+### Test Utilities
+
+**TestGitRepo** - Helper class for isolated Git testing:
+```typescript
+const repo = new TestGitRepo()
+await repo.init()
+await repo.writeFile('prompts/test.md', 'content')
+await repo.commit('Add prompt')
+await repo.runEdgit(['tag', 'create', 'test-prompt', 'v1.0.0'])
+```
+
+**Fixtures**:
+- Sample prompt files
+- Sample agent scripts
+- Sample SQL queries
+- Sample config files
+- Test component registries
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Watch mode for development
+npm run test:watch
+
+# Coverage report
+npm run test:coverage
+
+# Run specific test file
+npm test components-list-enhanced
+```
 
 ## Known Issues & TODOs
 
 ### Critical
-- [ ] No test infrastructure
-- [ ] No error type system
-- [ ] Inconsistent error handling patterns
 - [ ] No ESLint/Prettier configuration
+- [ ] No error type system (still using generic errors)
+- [ ] Inconsistent error handling patterns across commands
 
 ### High Priority
-- [ ] Component name collision handling could be improved
 - [ ] GitWrapper should support dependency injection (currently creates instances)
 - [ ] AI commit timeout is hardcoded (10s)
-- [ ] No validation before destructive operations
+- [ ] No validation before destructive operations (tag deletion, etc.)
+- [ ] Component resolver needs integration into Conductor loaders
 
 ### Medium Priority
-- [ ] Registry could be cached in memory
-- [ ] Component detection is O(n) on all files
+- [ ] Registry could be cached in memory for performance
+- [ ] Component detection is O(n) on all files (acceptable for now)
 - [ ] No progress indicators for long operations
 - [ ] Limited logging/debug mode
 
 ### Documentation
 - [ ] JSDoc comments sparse in utilities
 - [ ] No architecture decision records (ADRs)
-- [ ] No API documentation
-- [ ] Examples directory is empty
+- [ ] Examples directory needs more samples
+- [ ] API documentation could be more comprehensive
+
+### Completed Recently
+- [x] Test infrastructure (Vitest with 160 tests)
+- [x] Component listing with multiple output formats
+- [x] Component discovery commands (scan, detect, patterns)
+- [x] Component resolution system
+- [x] Untracked component detection
+- [x] Deployment tag indicators
+- [x] Enhanced component name collision detection
 
 ## Troubleshooting
 

@@ -328,14 +328,19 @@ edgit tag create helper-prompt v1.0.0
 edgit deploy set helper-prompt v1.0.0 --to prod
 # Creates/moves Git tag: components/helper-prompt/prod → v1.0.0
 
-# Navigate the multiverse
+# Navigate the multiverse - see all versions
 edgit tag list helper-prompt
 # v1.0.0  (Portal created: 2024-10-31, SHA: abc1234)
 
 # See which reality is deployed where
-edgit deploy status helper-prompt  
+edgit deploy status helper-prompt
 # prod:    v1.0.0 (this reality)
 # staging: (exploring other possibilities)
+
+# Or see everything at once with components list
+edgit components list --format tree
+# helper-prompt (prompt)
+# └── v1.0.0 [prod]  ← Your component is deployed!
 ```
 
 **Advanced multiverse navigation:**
@@ -459,8 +464,8 @@ edgit deploy set my-prompt v1.0.0 --to prod  # Deploy to production reality
 # Initialize repository
 edgit init [--force]
 
-# Component management  
-edgit components                    # List all components
+# Component management
+edgit components list [options]     # List components with version info
 edgit components show <component>   # Show component details
 
 # Version management
@@ -471,12 +476,234 @@ edgit tag delete <component> <version>    # Delete version
 
 # Deployment management
 edgit deploy set <component> <version> --to <env>  # Deploy version
-edgit deploy status [component]                    # Show deployments  
+edgit deploy status [component]                    # Show deployments
 edgit deploy list                                  # List all deployments
 edgit deploy promote <component> <from> <to>       # Promote between envs
 
 # Commit assistance (optional)
 edgit commit [-m message]           # AI-assisted or manual commit
+```
+
+### Component Listing: Navigate Your Multiverse
+
+The `edgit components list` command provides powerful views into your component multiverse with multiple output formats and filtering options.
+
+**Basic Usage:**
+```bash
+# Show all components with their versions (table format)
+edgit components list
+
+# Output:
+Component       Type    Latest Version  Versions  Deployment
+---------------------------------------------------------
+helper-prompt   prompt  v2.1.0          5         prod: v2.1.0, staging: v2.0.0
+data-agent      agent   v3.0.0          12        prod: v2.1.3
+auth-query      sql     v1.5.0          3         prod: v1.5.0
+api-config      config  v1.0.0          1         (none)
+```
+
+**Output Formats:**
+```bash
+# JSON output (for scripts and automation)
+edgit components list --format json
+# Returns structured JSON with full version history
+
+# YAML output (for configuration)
+edgit components list --format yaml
+# Clean YAML format for easy reading
+
+# Tree output (visual hierarchy with deployment indicators)
+edgit components list --format tree
+# Shows component versions in tree structure with deployment tags
+
+# Table output (default, human-readable)
+edgit components list --format table
+# Formatted table with columns
+```
+
+**Tree Format with Deployment Indicators:**
+```bash
+edgit components list --format tree
+
+# Output shows deployment status inline:
+helper-prompt (prompt)
+├── v2.1.0 [prod, staging]  ← Currently deployed
+├── v2.0.0 [dev]
+├── v1.5.0
+├── v1.0.0
+└── v0.9.0
+
+data-agent (agent)
+├── v3.0.0 [staging]        ← Testing in staging
+├── v2.1.3 [prod]           ← Stable in production
+└── v2.0.0
+```
+
+**Filtering by Component Type:**
+```bash
+# Show only prompts
+edgit components list --type prompt
+
+# Show only agents
+edgit components list --type agent
+
+# Show only SQL components
+edgit components list --type sql
+
+# Show only config components
+edgit components list --type config
+```
+
+**Version Filtering:**
+```bash
+# Show only components with version tags
+edgit components list --tags-only
+
+# Show components that are untracked (files exist but not in registry)
+edgit components list --untracked
+
+# Show only tracked components (registered in .edgit/components.json)
+edgit components list --tracked
+
+# Limit number of versions shown per component
+edgit components list --limit 3
+```
+
+**Combining Filters:**
+```bash
+# Show top 5 versions of prompt components with tags
+edgit components list --type prompt --tags-only --limit 5
+
+# Show untracked SQL files (potential new components)
+edgit components list --type sql --untracked
+
+# JSON output of tracked agents
+edgit components list --type agent --tracked --format json
+```
+
+**Practical Workflows:**
+
+*Discover Untracked Components:*
+```bash
+# Find component files that aren't registered yet
+edgit components list --untracked
+
+# Output shows detected but unregistered files:
+Component         Type    Path                        Status
+-----------------------------------------------------------
+new-prompt       prompt  prompts/new.prompt.md       untracked
+helper-script    agent   scripts/helper.sh           untracked
+```
+
+*Audit Version History:*
+```bash
+# See full version history in tree format
+edgit components list --format tree
+
+# Limit to recent versions for quick overview
+edgit components list --limit 5 --format tree
+```
+
+*Check Deployment Status:*
+```bash
+# Table view shows which versions are deployed where
+edgit components list --format table
+
+# Tree view shows deployment tags inline with versions
+edgit components list --format tree
+```
+
+*Export for Scripts:*
+```bash
+# Get component data as JSON for automation
+edgit components list --format json > components.json
+
+# Filter and process with jq
+edgit components list --format json | jq '.[] | select(.type == "prompt")'
+```
+
+**Output Format Details:**
+
+*Table Format (Default):*
+- Shows: Component name, type, latest version, version count, deployment status
+- Best for: Quick human-readable overview
+- Deployment column shows: `env: version` format
+
+*JSON Format:*
+- Full structured data including all versions and deployments
+- Best for: Scripting, automation, programmatic access
+- Includes: name, type, path, versions array, deployments object
+
+*YAML Format:*
+- Clean, readable structured format
+- Best for: Configuration files, documentation
+- Easy to copy/paste into YAML configs
+
+*Tree Format:*
+- Visual hierarchy showing version relationships
+- Deployment indicators shown inline: `v1.0.0 [prod, staging]`
+- Best for: Understanding version history and deployment flow
+
+### Component Discovery Commands
+
+Edgit provides powerful discovery tools to find and analyze potential components in your repository:
+
+**Scan for Components:**
+```bash
+# Scan all files in repository (tracked and untracked)
+edgit discover scan
+
+# Scan only git-tracked files
+edgit discover scan --tracked-only
+
+# Filter by component type
+edgit discover scan --type prompt
+edgit discover scan --type agent
+
+# Scan specific file patterns
+edgit discover scan --pattern "*.md"
+edgit discover scan --pattern "scripts/**/*.py"
+
+# Show only files with version headers
+edgit discover scan --with-headers
+
+# Output formats
+edgit discover scan --output json
+edgit discover scan --output simple
+```
+
+**Analyze Specific Files:**
+```bash
+# Get detailed analysis of a specific file
+edgit discover detect prompts/my-prompt.md
+
+# Shows: component type, confidence level, suggested name, patterns matched
+```
+
+**Manage Detection Patterns:**
+```bash
+# List all detection patterns
+edgit discover patterns list
+
+# Add custom pattern
+edgit discover patterns add prompt "*.prompt.txt"
+edgit discover patterns add agent "workers/**/*.ts"
+
+# Remove pattern
+edgit discover patterns remove prompt "*.old.md"
+```
+
+**Discovery vs Components List:**
+
+- `edgit discover scan` - Analyzes **all files** to find potential components
+- `edgit components list --untracked` - Shows files detected but **not yet registered**
+
+```bash
+# Full discovery workflow
+edgit discover scan --type prompt          # Find all prompt-like files
+edgit components list --untracked          # See which ones aren't registered yet
+edgit init --force                         # Register discovered components
+edgit components list --format tree        # View your complete component registry
 ```
 
 ### AI Integration Setup

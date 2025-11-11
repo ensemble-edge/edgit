@@ -64,13 +64,28 @@ edgit components
 # 📦 company-agent: v2.1.0 (yesterday)
 # 📦 scorer-sql: v1.0.0 (last week)
 
-# 5. Access any version from history
-edgit show extraction-prompt
+# 5. See all your components and their versions
+edgit components list --format tree
 # Output:
-# v1.3.0 (current) - commit: abc123
-# v1.2.0 - commit: def456
-# v1.1.0 - commit: ghi789
-# v1.0.0 - commit: jkl012
+# extraction-prompt (prompt)
+# ├── v1.3.0 [prod]  ← Current
+# ├── v1.2.0
+# ├── v1.1.0
+# └── v1.0.0
+#
+# company-agent (agent)
+# └── v2.1.0 [prod, staging]
+
+# Discover untracked components
+edgit components list --untracked
+# Shows component files that exist but aren't registered yet
+
+# Navigate version history
+edgit tag list extraction-prompt
+# v1.3.0  (Portal created: 2024-10-31, SHA: abc123)
+# v1.2.0  (Portal created: 2024-10-30, SHA: def456)
+# v1.1.0  (Portal created: 2024-10-29, SHA: ghi789)
+# v1.0.0  (Portal created: 2024-10-28, SHA: jkl012)
 
 # Test old vs new
 edgit test --compare "prompt@v1.0" "prompt@v1.3"
@@ -190,7 +205,7 @@ test("prompt@v1.0.0 + agent@v1.2.0");  // Ancient prompt, new agent
 npm install -g @ensemble-edge/edgit
 
 # Initialize in any Git repo
-edgit setup
+edgit init
 
 # Now Git commands automatically version components
 git add prompts/extraction.md
@@ -201,11 +216,35 @@ git commit -m "Improve extraction prompt"
 # - Component version: extraction-prompt@v1.3.0 (individual component)
 # - Stored in: .edgit/components.json
 
-# Access the multiverse locally
-edgit components                        # See all component versions
-edgit show extraction-prompt            # See version history
-edgit checkout extraction-prompt@v1.0.0 # Retrieve any version from Git
+# Access the multiverse - see all components and versions
+edgit components list --format tree
+# Shows visual tree of all components with deployment indicators
+
+edgit components list --format json
+# Get structured data for automation and scripts
+
+edgit components list --untracked
+# Discover component files that aren't registered yet
+
+# Explore and discover potential components
+edgit discover scan
+# Scans repository for all potential components
+
+edgit discover scan --type prompt --output json
+# Find all prompts and output as structured data
+
+edgit discover detect prompts/my-file.md
+# Analyze specific file - what type? confidence? suggested name?
+
+# Navigate version history
+edgit tag list extraction-prompt
+# See all versions with creation dates and SHAs
+
+edgit checkout extraction-prompt@v1.0.0
+# Retrieve any version from Git history
+
 edgit test --versions "prompt@v1.0,agent@v2.1,sql@v0.1"
+# Test any combination locally
 
 # Push to GitHub as normal - the multiverse travels with Git
 git push origin main
@@ -213,12 +252,16 @@ git push origin main
 
 **What You Get in Phase 1:**
 
-- ✅ Component-level versioning (not just repo versioning)  
-- ✅ Access any historical version from Git  
-- ✅ Test any combination locally  
-- ✅ Tag components independently (prod, canary, stable)  
-- ✅ See the invisible multiverse  
-- ✅ Zero infrastructure required  
+- ✅ Component-level versioning (not just repo versioning)
+- ✅ **Visual component exploration** (tree, table, JSON, YAML formats)
+- ✅ **Discover untracked components** (find files that should be versioned)
+- ✅ **Scan and detect components** (analyze repository for component patterns)
+- ✅ Access any historical version from Git
+- ✅ Test any combination locally
+- ✅ Tag components independently (prod, canary, stable)
+- ✅ **See deployment indicators** (which versions are deployed where)
+- ✅ See the invisible multiverse
+- ✅ Zero infrastructure required
 - ✅ Works with existing Git workflow
 
 ### Phase 2: Edge Multiverse Deployment (Optional Cloudflare)

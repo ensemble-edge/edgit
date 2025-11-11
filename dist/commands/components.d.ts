@@ -14,6 +14,31 @@ export declare class ComponentsCommand extends Command {
      */
     private listComponents;
     /**
+     * Find untracked components (files that exist but aren't in registry)
+     * Leverages existing ComponentDetector and file discovery infrastructure
+     */
+    private findUntrackedComponents;
+    /**
+     * Find all files in the repository (tracked + untracked)
+     */
+    private findAllFiles;
+    /**
+     * List components in table format (default)
+     */
+    private listComponentsTable;
+    /**
+     * List components in JSON format
+     */
+    private listComponentsJSON;
+    /**
+     * List components in YAML format
+     */
+    private listComponentsYAML;
+    /**
+     * List components in tree format
+     */
+    private listComponentsTree;
+    /**
      * Show detailed information about a specific component
      */
     private showComponent;
