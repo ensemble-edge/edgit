@@ -1678,11 +1678,31 @@ const journey = {
 
 ---
 
+## **Documentation Review Notes**
+
+### Agent vs Member Terminology Review
+**Added**: 2025-11-11
+**Location**: [docs/edgit/guides/component-types.mdx](/workspace/ensemble/docs/edgit/guides/component-types.mdx)
+
+**Issue**: The Edgit documentation describes "agent" as a component type (lines 213-256), which may cause confusion with Conductor's "members" terminology.
+
+**Context**:
+- **Edgit "agent" component type**: Valid for versioning standalone AI agent code/config files (e.g., customer support bot code, autonomous systems)
+- **Conductor "members"**: Orchestration units within ensemble workflows (Think, Function, API, etc.)
+- These are different concepts that serve different purposes
+
+**Action needed**: Review at end of Conductor documentation updates to determine if:
+1. Clarification note should be added to component-types.mdx
+2. Cross-references between Edgit agents and Conductor members should be added
+3. Examples should demonstrate both concepts working together
+
+---
+
 ## **Join the Revolution**
 
-**GitHub**: [github.com/ensemble-edge](https://github.com/ensemble-edge)  
-**NPM**: [@ensemble-edge](https://www.npmjs.com/org/ensemble-edge)  
-**Email**: [hello@ensemble.ai](mailto:hello@ensemble.ai)  
+**GitHub**: [github.com/ensemble-edge](https://github.com/ensemble-edge)
+**NPM**: [@ensemble-edge](https://www.npmjs.com/org/ensemble-edge)
+**Email**: [hello@ensemble.ai](mailto:hello@ensemble.ai)
 **Domain**: ensemble.ai
 
 The multiverse is open source. The future is orchestrated. The revolution starts with you.
