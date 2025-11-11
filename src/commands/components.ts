@@ -7,6 +7,7 @@ import { createGitTagManager } from '../utils/git-tags.js'
 import type { ComponentRegistry } from '../models/components.js'
 import { ComponentUtils, ComponentSpec, ComponentSpecParser } from '../models/components.js'
 import { createRegistryLoader } from '../utils/registry.js'
+import { ComponentDetector } from '../utils/component-detector.js'
 
 /**
  * ComponentsCommand for Git tag-based component management
@@ -32,37 +33,45 @@ export class ComponentsCommand extends Command {
       await this.validateGitInstalled()
       await this.validateGitRepo()
 
-      const { flags, positional } = this.parseArgs(args)
+      const { flags, options, positional } = this.parseArgs(args)
       const [subcommand, ...subArgs] = positional
+
+      // Merge flags and options for consistent handling
+      const allFlags: Record<string, boolean | string | number> = { ...flags, ...options }
+
+      // Convert numeric options
+      if (allFlags.limit && typeof allFlags.limit === 'string') {
+        allFlags.limit = parseInt(allFlags.limit, 10)
+      }
 
       // Load components registry
       const registry = await this.loadComponentsRegistry()
 
       if (!subcommand || subcommand === 'list' || subcommand === 'ls') {
-        await this.listComponents(registry, flags)
+        await this.listComponents(registry, allFlags)
       } else if (subcommand === 'show') {
         if (!subArgs[0]) {
           throw new Error('Component name is required for show command')
         }
-        await this.showComponent(registry, subArgs[0], flags)
+        await this.showComponent(registry, subArgs[0], allFlags)
       } else if (subcommand === 'checkout') {
         if (!subArgs[0]) {
           throw new Error('Component specification is required for checkout command')
         }
-        await this.checkoutComponent(registry, subArgs[0], flags)
+        await this.checkoutComponent(registry, subArgs[0], allFlags)
       } else if (subcommand === 'add') {
         if (!subArgs[0] || !subArgs[1]) {
           throw new Error('Component name and path are required for add command')
         }
-        await this.addComponent(registry, subArgs[0], subArgs[1], subArgs[2], flags)
+        await this.addComponent(registry, subArgs[0], subArgs[1], subArgs[2], allFlags)
       } else if (subcommand === 'remove' || subcommand === 'rm') {
         if (!subArgs[0]) {
           throw new Error('Component name is required for remove command')
         }
-        await this.removeComponent(registry, subArgs[0], flags)
+        await this.removeComponent(registry, subArgs[0], allFlags)
       } else {
         // Treat as component name for show
-        await this.showComponent(registry, subcommand, flags)
+        await this.showComponent(registry, subcommand, allFlags)
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -80,23 +89,180 @@ export class ComponentsCommand extends Command {
    */
   private async listComponents(
     registry: ComponentRegistry,
-    flags: Record<string, boolean>
+    flags: Record<string, boolean | string | number>
   ): Promise<void> {
-    const componentEntries = ComponentUtils.getAllComponents(registry)
+    // Apply filters
+    const typeFilter = flags.type as string | undefined
+    const tagsOnly = flags['tags-only'] as boolean | undefined
+    const tracked = flags.tracked as boolean | undefined
+    const untracked = flags.untracked as boolean | undefined
+
+    let componentEntries: Array<{ name: string; component: any }>
+
+    // Handle tracked/untracked filtering
+    if (untracked) {
+      // Show only untracked components (files exist but not in registry)
+      const untrackedComponents = await this.findUntrackedComponents(registry)
+      componentEntries = untrackedComponents
+    } else if (tracked) {
+      // Show only tracked components (in registry)
+      componentEntries = ComponentUtils.getAllComponents(registry)
+    } else {
+      // Show all components (both tracked and untracked)
+      const trackedComponents = ComponentUtils.getAllComponents(registry)
+      const untrackedComponents = await this.findUntrackedComponents(registry)
+      componentEntries = [...trackedComponents, ...untrackedComponents]
+    }
 
     if (componentEntries.length === 0) {
-      this.showInfo(
-        'No components found. Add components with "edgit components add <name> <path> <type>".'
-      )
+      if (untracked) {
+        this.showInfo('No untracked components found.')
+      } else if (tracked) {
+        this.showInfo(
+          'No tracked components found. Add components with "edgit components add <name> <path> <type>".'
+        )
+      } else {
+        this.showInfo(
+          'No components found. Add components with "edgit components add <name> <path> <type>".'
+        )
+      }
       return
     }
 
+    // Filter by type
+    if (typeFilter) {
+      componentEntries = componentEntries.filter(
+        ({ component }) => component.type === typeFilter
+      )
+    }
+
+    // Filter by tag status
+    if (tagsOnly) {
+      const entriesWithTags = []
+      for (const entry of componentEntries) {
+        const tags = await this.tagManager.listComponentTags(entry.name)
+        if (tags.length > 0) {
+          entriesWithTags.push(entry)
+        }
+      }
+      componentEntries = entriesWithTags
+    }
+
+    if (componentEntries.length === 0) {
+      console.log('\n⚠️  No components match the specified filters')
+      return
+    }
+
+    // Determine output format
+    const format = (flags.format as string) || 'table'
+    const limit = (flags.limit as number) || undefined
+
+    if (format === 'json') {
+      await this.listComponentsJSON(componentEntries, limit)
+    } else if (format === 'yaml') {
+      await this.listComponentsYAML(componentEntries, limit)
+    } else if (format === 'tree') {
+      await this.listComponentsTree(componentEntries, limit)
+    } else {
+      await this.listComponentsTable(componentEntries, flags, limit)
+    }
+  }
+
+  /**
+   * Find untracked components (files that exist but aren't in registry)
+   * Leverages existing ComponentDetector and file discovery infrastructure
+   */
+  private async findUntrackedComponents(
+    registry: ComponentRegistry
+  ): Promise<Array<{ name: string; component: any }>> {
+    const untrackedComponents: Array<{ name: string; component: any }> = []
+
+    // Use ComponentDetector to identify component files
+    const detector = new ComponentDetector(this.git)
+
+    // Get all tracked component paths for comparison
+    const trackedPaths = new Set<string>()
+    for (const [name, component] of Object.entries(registry.components)) {
+      trackedPaths.add(path.normalize(component.path))
+    }
+
+    // Get all files (tracked + untracked) from git
+    const allFiles = await this.findAllFiles()
+
+    // Scan each file with ComponentDetector
+    for (const filePath of allFiles) {
+      const normalizedPath = path.normalize(filePath)
+
+      // Skip if already tracked in registry
+      if (trackedPaths.has(normalizedPath)) {
+        continue
+      }
+
+      // Skip files in .edgit directory
+      if (normalizedPath.includes('.edgit')) {
+        continue
+      }
+
+      // Use detector to identify component type
+      const detected = detector.detectComponent(filePath)
+      if (!detected) {
+        continue
+      }
+
+      // Check if this component name is already tracked (different path)
+      if (registry.components[detected.name]) {
+        continue
+      }
+
+      untrackedComponents.push({
+        name: detected.name,
+        component: {
+          path: filePath,
+          type: detected.type,
+          untracked: true, // Mark as untracked
+        },
+      })
+    }
+
+    return untrackedComponents
+  }
+
+  /**
+   * Find all files in the repository (tracked + untracked)
+   */
+  private async findAllFiles(): Promise<string[]> {
+    try {
+      // Get tracked files
+      const trackedResult = await this.git.exec(['ls-files'])
+      const trackedFiles = trackedResult.stdout.split('\n').filter((f: string) => f.trim())
+
+      // Get untracked files (excluding ignored files)
+      const untrackedResult = await this.git.exec(['ls-files', '--others', '--exclude-standard'])
+      const untrackedFiles = untrackedResult.stdout.split('\n').filter((f: string) => f.trim())
+
+      // Combine and deduplicate
+      const allFiles = [...new Set([...trackedFiles, ...untrackedFiles])]
+      return allFiles
+    } catch (error) {
+      console.error('Error listing files:', error)
+      return []
+    }
+  }
+
+  /**
+   * List components in table format (default)
+   */
+  private async listComponentsTable(
+    componentEntries: Array<{ name: string; component: any }>,
+    flags: Record<string, boolean | string | number>,
+    limit?: number
+  ): Promise<void> {
     console.log(`\n🧩 Components (${componentEntries.length} total):\n`)
 
     if (flags.verbose || flags.v) {
       // Verbose listing with Git tag details
       for (const { name, component } of componentEntries) {
-        await this.showComponentSummary(name, component, true)
+        await this.showComponentSummary(name, component, true, limit)
         console.log('')
       }
     } else {
@@ -113,10 +279,170 @@ export class ComponentsCommand extends Command {
       for (const [type, components] of Object.entries(byType)) {
         console.log(`📁 ${type}:`)
         for (const { name, component } of components) {
-          await this.showComponentSummary(name, component, false)
+          await this.showComponentSummary(name, component, false, limit)
         }
         console.log('')
       }
+    }
+  }
+
+  /**
+   * List components in JSON format
+   */
+  private async listComponentsJSON(
+    componentEntries: Array<{ name: string; component: any }>,
+    limit?: number
+  ): Promise<void> {
+    const output: any[] = []
+
+    for (const { name, component } of componentEntries) {
+      const versionTags = await this.tagManager.getVersionTags(name)
+      const deploymentTags = await this.tagManager.getDeploymentTags(name)
+
+      // Apply limit
+      const versions = limit ? versionTags.slice(-limit) : versionTags
+
+      output.push({
+        name,
+        type: component.type,
+        path: component.path,
+        versions,
+        deploymentTags,
+        versionCount: versionTags.length,
+      })
+    }
+
+    console.log(JSON.stringify(output, null, 2))
+  }
+
+  /**
+   * List components in YAML format
+   */
+  private async listComponentsYAML(
+    componentEntries: Array<{ name: string; component: any }>,
+    limit?: number
+  ): Promise<void> {
+    console.log('components:')
+
+    for (const { name, component } of componentEntries) {
+      const versionTags = await this.tagManager.getVersionTags(name)
+      const deploymentTags = await this.tagManager.getDeploymentTags(name)
+
+      // Apply limit
+      const versions = limit ? versionTags.slice(-limit) : versionTags
+
+      console.log(`  - name: ${name}`)
+      console.log(`    type: ${component.type}`)
+      console.log(`    path: ${component.path}`)
+      console.log(`    versions:`)
+      for (const version of versions) {
+        console.log(`      - ${version}`)
+      }
+      if (deploymentTags.length > 0) {
+        console.log(`    deploymentTags:`)
+        for (const tag of deploymentTags) {
+          console.log(`      - ${tag}`)
+        }
+      }
+    }
+  }
+
+  /**
+   * List components in tree format
+   */
+  private async listComponentsTree(
+    componentEntries: Array<{ name: string; component: any }>,
+    limit?: number
+  ): Promise<void> {
+    console.log('\nRepository Components:\n')
+
+    // Group by type
+    const byType = componentEntries.reduce(
+      (acc, { name, component }) => {
+        if (!acc[component.type]) acc[component.type] = []
+        acc[component.type]!.push({ name, component })
+        return acc
+      },
+      {} as Record<string, Array<{ name: string; component: any }>>
+    )
+
+    const types = Object.keys(byType)
+    for (let typeIdx = 0; typeIdx < types.length; typeIdx++) {
+      const type = types[typeIdx]!
+      const components = byType[type]!
+      const isLastType = typeIdx === types.length - 1
+
+      console.log(`${isLastType ? '└─' : '├─'} ${type} (${components.length} components)`)
+
+      for (let compIdx = 0; compIdx < components.length; compIdx++) {
+        const { name, component } = components[compIdx]!
+        const isLastComp = compIdx === components.length - 1
+
+        const versionTags = await this.tagManager.getVersionTags(name)
+        const deploymentTags = await this.tagManager.getDeploymentTags(name)
+
+        // Apply limit
+        const versions = limit ? versionTags.slice(-limit) : versionTags
+
+        const prefix = isLastType ? '   ' : '│  '
+        console.log(`${prefix}${isLastComp ? '└─' : '├─'} ${name}`)
+
+        // Show versions
+        for (let verIdx = 0; verIdx < versions.length; verIdx++) {
+          const version = versions[verIdx]!
+          const isLastVer = verIdx === versions.length - 1 && deploymentTags.length === 0
+
+          try {
+            const tagInfo = await this.tagManager.getTagInfo(name, version)
+            // Handle invalid dates gracefully
+            let date = 'unknown'
+            if (tagInfo.date) {
+              try {
+                const dateObj = new Date(tagInfo.date)
+                if (!isNaN(dateObj.getTime())) {
+                  date = dateObj.toISOString().split('T')[0]!
+                }
+              } catch {
+                // Keep 'unknown' if date parsing fails
+              }
+            }
+            const sha = tagInfo.sha.substring(0, 8)
+
+            // Check if any deployment tag points here
+            const deployedAs: string[] = []
+            for (const depTag of deploymentTags) {
+              try {
+                const depSHA = await this.tagManager.getTagSHA(name, depTag)
+                if (process.env.DEBUG) {
+                  console.error(`  [DEBUG] Comparing: version ${version} SHA=${tagInfo.sha} vs ${depTag} SHA=${depSHA}`)
+                }
+                if (depSHA === tagInfo.sha) {
+                  deployedAs.push(depTag)
+                }
+              } catch (error) {
+                if (process.env.DEBUG) {
+                  console.error(`  [DEBUG] Error getting SHA for ${depTag}:`, error)
+                }
+              }
+            }
+
+            const deployBadge = deployedAs.length > 0 ? ` ← ${deployedAs.join(', ')}` : ''
+            const innerPrefix = isLastComp ? '      ' : '│     '
+            console.log(
+              `${prefix}${innerPrefix}${isLastVer ? '└─' : '├─'} ${version} (${sha}, ${date})${deployBadge}`
+            )
+          } catch (error) {
+            // If getTagInfo fails, show version without metadata
+            const innerPrefix = isLastComp ? '      ' : '│     '
+            console.log(`${prefix}${innerPrefix}${isLastVer ? '└─' : '├─'} ${version}`)
+            // Debug: Log error to help diagnose issues
+            if (process.env.DEBUG) {
+              console.error(`  [DEBUG] Error getting tag info for ${version}:`, error)
+            }
+          }
+        }
+      }
+      console.log('')
     }
   }
 
@@ -126,7 +452,7 @@ export class ComponentsCommand extends Command {
   private async showComponent(
     registry: ComponentRegistry,
     componentName: string,
-    flags: Record<string, boolean>
+    flags: Record<string, boolean | string | number>
   ): Promise<void> {
     const component = ComponentUtils.findComponentByName(registry, componentName)
 
@@ -246,7 +572,7 @@ export class ComponentsCommand extends Command {
   private async checkoutComponent(
     registry: ComponentRegistry,
     componentSpec: string,
-    flags: Record<string, boolean>
+    flags: Record<string, boolean | string | number>
   ): Promise<void> {
     const spec = ComponentSpecParser.parse(componentSpec)
     const component = ComponentUtils.findComponentByName(registry, spec.name)
@@ -290,7 +616,7 @@ export class ComponentsCommand extends Command {
     name: string,
     filePath: string,
     type?: string,
-    flags?: Record<string, boolean>
+    flags?: Record<string, boolean | string | number>
   ): Promise<void> {
     // Validate component doesn't already exist
     if (ComponentUtils.componentExists(registry, name)) {
@@ -357,7 +683,7 @@ export class ComponentsCommand extends Command {
   private async removeComponent(
     registry: ComponentRegistry,
     componentName: string,
-    flags: Record<string, boolean>
+    flags: Record<string, boolean | string | number>
   ): Promise<void> {
     if (!ComponentUtils.componentExists(registry, componentName)) {
       throw new Error(`Component '${componentName}' not found`)
@@ -391,15 +717,19 @@ export class ComponentsCommand extends Command {
   private async showComponentSummary(
     name: string,
     component: any,
-    verbose: boolean
+    verbose: boolean,
+    limit?: number
   ): Promise<void> {
     try {
-      const versionTags = await this.tagManager.getVersionTags(name)
+      const allVersionTags = await this.tagManager.getVersionTags(name)
       const deploymentTags = await this.tagManager.getDeploymentTags(name)
 
+      // Apply limit if specified
+      const versionTags = limit && limit > 0 ? allVersionTags.slice(-limit) : allVersionTags
+
       let latestVersion = 'none'
-      if (versionTags.length > 0) {
-        latestVersion = versionTags[versionTags.length - 1] || 'none'
+      if (allVersionTags.length > 0) {
+        latestVersion = allVersionTags[allVersionTags.length - 1] || 'none'
       }
 
       if (verbose) {
@@ -407,14 +737,15 @@ export class ComponentsCommand extends Command {
         console.log(`   Type: ${component.type}`)
         console.log(`   Path: ${component.path}`)
         console.log(`   Latest: ${latestVersion}`)
-        console.log(`   Versions: ${versionTags.length}`)
+        console.log(`   Versions: ${allVersionTags.length}${limit ? ` (showing ${versionTags.length})` : ''}`)
 
         if (deploymentTags.length > 0) {
           console.log(`   Deployments: ${deploymentTags.join(', ')}`)
         }
       } else {
         const deployInfo = deploymentTags.length > 0 ? ` [${deploymentTags.join(',')}]` : ''
-        console.log(`   📦 ${name}: ${latestVersion} (${versionTags.length} versions)${deployInfo}`)
+        const limitInfo = limit && allVersionTags.length > limit ? ` (showing ${limit})` : ''
+        console.log(`   📦 ${name}: ${latestVersion} (${allVersionTags.length} versions${limitInfo})${deployInfo}`)
       }
     } catch (error) {
       // Fallback if Git tag operations fail
@@ -471,7 +802,7 @@ edgit components - Manage components using Git tags
 
 USAGE:
   edgit components [subcommand] [options]
-  edgit components list [--verbose]         List all components
+  edgit components list [options]           List all components
   edgit components show <component> [--content] Show component details
   edgit components checkout <component>[@ref] Checkout component content
   edgit components add <name> <path> [type] Add new component
@@ -500,9 +831,21 @@ OPTIONS:
   --verbose, -v     Show detailed information
   --content, -c     Show file content (with show command)
   --force           Force operation (bypass warnings)
+  --type <type>     Filter by component type (list command)
+  --tracked         Show only tracked components (list command)
+  --untracked       Show only untracked components (list command)
+  --tags-only       Show only components with version tags (list command)
+  --limit <n>       Max versions to show per component (list command, default: all)
+  --format <fmt>    Output format: table (default), json, yaml, tree (list command)
 
 EXAMPLES:
-  edgit components                          # List all components
+  edgit components                          # List all components (table format)
+  edgit components list --format json       # List in JSON format
+  edgit components list --format tree       # List in tree format with hierarchy
+  edgit components list --type prompt       # List only prompt components
+  edgit components list --tags-only         # List only versioned components
+  edgit components list --limit 5           # Show max 5 versions per component
+  edgit components list --tracked           # Show only tracked components
   edgit components show extraction-prompt   # Show component details
   edgit components checkout extraction-prompt@v1.0.0 # Show specific version
   edgit components add my-prompt prompts/test.md prompt # Add new component

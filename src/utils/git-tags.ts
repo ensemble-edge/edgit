@@ -189,9 +189,11 @@ export class GitTagManager {
     const gitTag = `components/${component}/${tagName}`
 
     // Get tag object info
+    // Use %(if)%(*objectname)%(then)%(*objectname)%(else)%(objectname)%(end) to handle both
+    // annotated tags (dereferenced) and lightweight tags
     const result = await this.git.exec([
       'for-each-ref',
-      '--format=%(objectname)|%(authordate:iso)|%(contents:subject)|%(authorname)',
+      '--format=%(if)%(*objectname)%(then)%(*objectname)%(else)%(objectname)%(end)|%(authordate:iso)|%(contents:subject)|%(authorname)',
       `refs/tags/${gitTag}`,
     ])
 
@@ -204,11 +206,11 @@ export class GitTagManager {
       throw new Error(`Invalid tag format for: ${gitTag}`)
     }
 
-    const [sha, date, message, author] = parts
+    const [commitSHA, date, message, author] = parts
 
     return {
       tag: tagName,
-      sha: sha || '',
+      sha: commitSHA || '',
       date: date || '',
       message: message || '',
       author: author || '',
