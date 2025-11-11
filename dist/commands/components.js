@@ -279,12 +279,12 @@ export class ComponentsCommand extends Command {
             console.log(`  - name: ${name}`);
             console.log(`    type: ${component.type}`);
             console.log(`    path: ${component.path}`);
-            console.log(`    versions:`);
+            console.log('    versions:');
             for (const version of versions) {
                 console.log(`      - ${version}`);
             }
             if (deploymentTags.length > 0) {
-                console.log(`    deploymentTags:`);
+                console.log('    deploymentTags:');
                 for (const tag of deploymentTags) {
                     console.log(`      - ${tag}`);
                 }
