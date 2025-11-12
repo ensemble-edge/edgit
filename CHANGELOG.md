@@ -1,5 +1,19 @@
 # @ensemble-edge/edgit
 
+## 1.0.0
+
+### Major Changes
+
+- b742dc7: **BREAKING CHANGES**: Component nomenclature refactor for agent/component separation
+  - Component types renamed: 'sql' → 'query', 'agent' → 'script'
+  - Added new 'agent-definition' component type for agent.yaml files
+  - Implemented dual Git tag namespaces: `components/{name}/{version}` and `agents/{name}/{version}`
+  - Updated all detection patterns with proper priority ordering
+  - Enhanced GitTagManager with EntityType support for both components and agents
+  - Zero backward compatibility - clean v0.3.0 release
+
+  This enables different deployment strategies: agents (compiled) vs components (storage-based).
+
 ## 0.3.0 (Unreleased)
 
 ### BREAKING CHANGES
@@ -9,6 +23,7 @@
 This release introduces a clean nomenclature update to better distinguish between components and agents in AI system architectures. This is a breaking change with no backward compatibility.
 
 **New Component Types:**
+
 - `'query'` (previously `'sql'`) - Database queries and schemas
 - `'script'` (previously `'agent'`) - Executable scripts (.js, .ts, .py, .sh)
 - `'agent-definition'` (new) - Agent definition files (agent.yaml/yml)
@@ -16,12 +31,14 @@ This release introduces a clean nomenclature update to better distinguish betwee
 - `'config'` - Unchanged
 
 **Dual Git Tag Namespaces:**
+
 - **Components**: `components/{name}/{version}` - Versioned artifacts (prompts, queries, configs, scripts)
 - **Agents**: `agents/{name}/{version}` - Versioned workers (agent definitions)
 
 This separation enables different deployment strategies: agents can be compiled/built while components exist in storage (e.g., KV stores).
 
 **What Changed:**
+
 1. **ComponentType** enum updated across all files
 2. **Detection patterns** updated for new types:
    - Files like `*.agent.ts` now detected as `'script'`
@@ -32,12 +49,14 @@ This separation enables different deployment strategies: agents can be compiled/
 5. **File header formats** updated for new component types
 
 **Migration Guide:**
+
 - Update any scripts referencing `'agent'` type to use `'script'`
 - Update any scripts referencing `'sql'` type to use `'query'`
 - Agent versioning now uses `agents/` namespace instead of `components/`
 - No automated migration provided - this is a clean break for v0.3.0
 
 **Updated APIs:**
+
 ```typescript
 // GitTagManager - new EntityType parameter
 await tagManager.tag(name, tagName, 'agent', sha, message)
