@@ -4,7 +4,7 @@
 
 export type AIMode = 'auto' | 'enhance' | 'off'
 export type AIProviderName = 'openai' // Room for 'anthropic', 'gemini', etc.
-export type ComponentType = 'prompt' | 'agent' | 'sql' | 'config'
+export type ComponentType = 'prompt' | 'query' | 'config' | 'script' | 'agent-definition'
 
 export interface AIConfig {
   mode: AIMode
@@ -49,7 +49,8 @@ export interface PromptTemplates {
   repoMultiComponent: string
   repoSingleComponent: string
   componentPrompt: string
-  componentAgent: string
-  componentSQL: string
+  componentScript: string
+  componentQuery: string
   componentConfig: string
+  componentAgentDefinition: string
 }

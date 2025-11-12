@@ -56,7 +56,7 @@ describe('edgit components list - enhanced features', () => {
       // Add version tags
       await repo.runEdgit(['tag', 'create', 'extraction-prompt', 'v1.0.0'])
       await repo.runEdgit(['tag', 'create', 'extraction-prompt', 'v1.1.0'])
-      await repo.runEdgit(['tag', 'create', 'processor-agent', 'v2.0.0'])
+      await repo.runEdgit(['tag', 'create', 'processor-script', 'v2.0.0'])
     })
 
     it('should list components in default table format', async () => {
@@ -64,7 +64,7 @@ describe('edgit components list - enhanced features', () => {
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toContain('extraction-prompt')
-      expect(result.stdout).toContain('processor-agent')
+      expect(result.stdout).toContain('processor-script')
       expect(result.stdout).toContain('v1.1.0') // latest version
       expect(result.stdout).toContain('v2.0.0')
     })
@@ -87,12 +87,12 @@ describe('edgit components list - enhanced features', () => {
       expect(extractionPrompt.versions).toEqual(['v1.0.0', 'v1.1.0'])
       expect(extractionPrompt.versionCount).toBe(2)
 
-      // Check processor-agent component
-      const processorAgent = output.find((c: any) => c.name === 'processor-agent')
-      expect(processorAgent).toBeDefined()
-      expect(processorAgent.type).toBe('agent')
-      expect(processorAgent.versions).toEqual(['v2.0.0'])
-      expect(processorAgent.versionCount).toBe(1)
+      // Check processor-script component (now detected as 'script' type)
+      const processorScript = output.find((c: any) => c.name === 'processor-script')
+      expect(processorScript).toBeDefined()
+      expect(processorScript.type).toBe('script')
+      expect(processorScript.versions).toEqual(['v2.0.0'])
+      expect(processorScript.versionCount).toBe(1)
     })
 
     it('should list components in YAML format', async () => {
@@ -106,7 +106,7 @@ describe('edgit components list - enhanced features', () => {
       expect(result.stdout).toContain('versions:')
       expect(result.stdout).toContain('- v1.0.0')
       expect(result.stdout).toContain('- v1.1.0')
-      expect(result.stdout).toContain('- name: processor-agent')
+      expect(result.stdout).toContain('- name: processor-script')
     })
 
     it('should list components in tree format', async () => {
@@ -115,9 +115,9 @@ describe('edgit components list - enhanced features', () => {
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toContain('Repository Components')
       expect(result.stdout).toContain('prompt')
-      expect(result.stdout).toContain('agent')
+      expect(result.stdout).toContain('script')
       expect(result.stdout).toContain('extraction-prompt')
-      expect(result.stdout).toContain('processor-agent')
+      expect(result.stdout).toContain('processor-script')
       expect(result.stdout).toContain('v1.0.0')
       expect(result.stdout).toContain('v1.1.0')
       expect(result.stdout).toContain('v2.0.0')
@@ -138,7 +138,7 @@ describe('edgit components list - enhanced features', () => {
 
       // Add tags to some components
       await repo.runEdgit(['tag', 'create', 'test1-prompt', 'v1.0.0'])
-      await repo.runEdgit(['tag', 'create', 'agent1-agent', 'v2.0.0'])
+      await repo.runEdgit(['tag', 'create', 'agent1-script', 'v2.0.0'])
       // test2-prompt and query1 remain untagged
     })
 
@@ -148,26 +148,26 @@ describe('edgit components list - enhanced features', () => {
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toContain('test1-prompt')
       expect(result.stdout).toContain('test2-prompt')
-      expect(result.stdout).not.toContain('agent1-agent')
+      expect(result.stdout).not.toContain('agent1-script')
       expect(result.stdout).not.toContain('query1')
     })
 
-    it('should filter by component type - agent', async () => {
-      const result = await repo.runEdgit(['components', 'list', '--type', 'agent'])
+    it('should filter by component type - script', async () => {
+      const result = await repo.runEdgit(['components', 'list', '--type', 'script'])
 
       expect(result.exitCode).toBe(0)
-      expect(result.stdout).toContain('agent1-agent')
+      expect(result.stdout).toContain('agent1-script')
       expect(result.stdout).not.toContain('test1-prompt')
       expect(result.stdout).not.toContain('query1')
     })
 
-    it('should filter by component type - sql', async () => {
-      const result = await repo.runEdgit(['components', 'list', '--type', 'sql'])
+    it('should filter by component type - query', async () => {
+      const result = await repo.runEdgit(['components', 'list', '--type', 'query'])
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toContain('query1')
       expect(result.stdout).not.toContain('test1-prompt')
-      expect(result.stdout).not.toContain('agent1-agent')
+      expect(result.stdout).not.toContain('agent1-script')
     })
 
     it('should show only components with tags using --tags-only', async () => {
@@ -175,7 +175,7 @@ describe('edgit components list - enhanced features', () => {
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toContain('test1-prompt')
-      expect(result.stdout).toContain('agent1-agent')
+      expect(result.stdout).toContain('agent1-script')
       expect(result.stdout).not.toContain('test2-prompt')
       expect(result.stdout).not.toContain('query1')
     })
@@ -186,7 +186,7 @@ describe('edgit components list - enhanced features', () => {
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toContain('test1-prompt')
       expect(result.stdout).not.toContain('test2-prompt') // no tags
-      expect(result.stdout).not.toContain('agent1-agent') // wrong type
+      expect(result.stdout).not.toContain('agent1-script') // wrong type
       expect(result.stdout).not.toContain('query1') // wrong type
     })
   })

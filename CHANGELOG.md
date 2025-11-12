@@ -1,5 +1,69 @@
 # @ensemble-edge/edgit
 
+## 0.3.0 (Unreleased)
+
+### BREAKING CHANGES
+
+**Component Type Nomenclature Refactor**
+
+This release introduces a clean nomenclature update to better distinguish between components and agents in AI system architectures. This is a breaking change with no backward compatibility.
+
+**New Component Types:**
+- `'query'` (previously `'sql'`) - Database queries and schemas
+- `'script'` (previously `'agent'`) - Executable scripts (.js, .ts, .py, .sh)
+- `'agent-definition'` (new) - Agent definition files (agent.yaml/yml)
+- `'prompt'` - Unchanged
+- `'config'` - Unchanged
+
+**Dual Git Tag Namespaces:**
+- **Components**: `components/{name}/{version}` - Versioned artifacts (prompts, queries, configs, scripts)
+- **Agents**: `agents/{name}/{version}` - Versioned workers (agent definitions)
+
+This separation enables different deployment strategies: agents can be compiled/built while components exist in storage (e.g., KV stores).
+
+**What Changed:**
+1. **ComponentType** enum updated across all files
+2. **Detection patterns** updated for new types:
+   - Files like `*.agent.ts` now detected as `'script'`
+   - Files named `agent.yaml` detected as `'agent-definition'`
+   - SQL files now detected as `'query'`
+3. **GitTagManager** now supports both `'component'` and `'agent'` EntityTypes
+4. **AI commit messages** updated with new type-specific templates
+5. **File header formats** updated for new component types
+
+**Migration Guide:**
+- Update any scripts referencing `'agent'` type to use `'script'`
+- Update any scripts referencing `'sql'` type to use `'query'`
+- Agent versioning now uses `agents/` namespace instead of `components/`
+- No automated migration provided - this is a clean break for v0.3.0
+
+**Updated APIs:**
+```typescript
+// GitTagManager - new EntityType parameter
+await tagManager.tag(name, tagName, 'agent', sha, message)
+await tagManager.listTags(name, 'agent')
+await tagManager.getVersionTags(name, 'agent')
+
+// New agent-specific methods
+await tagManager.tagAgent(agentName, version)
+await tagManager.listAgentTags(agentName)
+```
+
+### Features
+
+- **Agent Versioning**: Full support for versioning agents separately from components
+- **Dual Namespaces**: Separate git tag namespaces for components and agents
+- **Improved Type Clarity**: Component types now clearly reflect their purpose
+- **Agent Definitions**: First-class support for `agent.yaml` files
+
+### Documentation
+
+- Updated README with agent versioning concepts
+- Updated package.json description to mention agents
+- All tests updated to reflect new nomenclature (162 tests passing)
+
+---
+
 ## 0.1.8
 
 ### Minor Changes

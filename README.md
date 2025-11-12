@@ -6,7 +6,7 @@
 npm install -g @ensemble-edge/edgit
 ```
 
-**Git tag-based component versioning for AI systems.** The multiverse already exists in your Git history - every version of every component lives in your commits. Edgit makes them accessible through native Git tags, eliminating merge conflicts while unlocking component independence.
+**Git tag-based component and agent versioning for AI systems.** The multiverse already exists in your Git history - every version of every component and agent lives in your commits. Edgit makes them accessible through native Git tags, eliminating merge conflicts while unlocking independent versioning for components and agents.
 
 ## Novel Architecture: The Multiverse Made Visible
 
@@ -65,7 +65,7 @@ components/sql-query/v1.0.0        ← Portal to the working version
 
 ## About
 
-Edgit wraps Git to add component-level versioning while maintaining 100% Git compatibility. Every prompt, agent, model config, and SQL query gets its own version automatically. Zero learning curve - your git commands just get smarter.
+Edgit wraps Git to add component-level and agent-level versioning while maintaining 100% Git compatibility. Every prompt, script, query, config, and agent definition gets its own version automatically. Components are versioned artifacts used by agents. Agents are versioned workers that consume components. Zero learning curve - your git commands just get smarter.
 
 ## Why Now? The Perfect Storm
 

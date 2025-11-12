@@ -49,99 +49,112 @@ describe('ComponentDetector', () => {
       })
     })
 
-    describe('agent detection', () => {
-      it('should detect files in agents/ directory', () => {
-        const result = detector.detectComponent('agents/processor.js')
-        expect(result).toBeTruthy()
-        expect(result?.type).toBe('agent')
-        expect(result?.name).toBe('processor-agent')
-      })
-
+    describe('script detection', () => {
       it('should detect JavaScript files in scripts/', () => {
         const result = detector.detectComponent('scripts/worker.js')
         expect(result).toBeTruthy()
-        expect(result?.type).toBe('agent')
+        expect(result?.type).toBe('script')
       })
 
       it('should detect TypeScript files in scripts/', () => {
         const result = detector.detectComponent('scripts/processor.ts')
         expect(result).toBeTruthy()
-        expect(result?.type).toBe('agent')
+        expect(result?.type).toBe('script')
       })
 
       it('should detect Python files in scripts/', () => {
         const result = detector.detectComponent('scripts/analyzer.py')
         expect(result).toBeTruthy()
-        expect(result?.type).toBe('agent')
+        expect(result?.type).toBe('script')
       })
 
       it('should detect shell scripts', () => {
         const result = detector.detectComponent('scripts/deploy.sh')
         expect(result).toBeTruthy()
-        expect(result?.type).toBe('agent')
+        expect(result?.type).toBe('script')
       })
 
       it('should detect bash scripts', () => {
         const result = detector.detectComponent('scripts/build.bash')
         expect(result).toBeTruthy()
-        expect(result?.type).toBe('agent')
+        expect(result?.type).toBe('script')
       })
 
-      it('should detect files with .agent extension', () => {
-        const result = detector.detectComponent('workers/handler.agent.js')
+      it('should detect files with .script extension', () => {
+        const result = detector.detectComponent('workers/handler.script.js')
         expect(result).toBeTruthy()
-        expect(result?.type).toBe('agent')
+        expect(result?.type).toBe('script')
       })
 
-      it('should detect files starting with agent', () => {
-        const result = detector.detectComponent('agent-handler.js')
+      it('should detect files starting with script', () => {
+        const result = detector.detectComponent('script-handler.js')
         expect(result).toBeTruthy()
-        expect(result?.type).toBe('agent')
+        expect(result?.type).toBe('script')
       })
     })
 
-    describe('sql detection', () => {
+    describe('agent-definition detection', () => {
+      it('should detect files in agents/ directory', () => {
+        const result = detector.detectComponent('agents/processor/agent.yaml')
+        expect(result).toBeTruthy()
+        expect(result?.type).toBe('agent-definition')
+      })
+
+      it('should detect agent.yaml files', () => {
+        const result = detector.detectComponent('agents/scraper/agent.yaml')
+        expect(result).toBeTruthy()
+        expect(result?.type).toBe('agent-definition')
+      })
+
+      it('should detect agent.yml files', () => {
+        const result = detector.detectComponent('agents/analyzer/agent.yml')
+        expect(result).toBeTruthy()
+        expect(result?.type).toBe('agent-definition')
+      })
+    })
+
+    describe('query detection', () => {
       it('should detect files in queries/ directory', () => {
         const result = detector.detectComponent('queries/users.sql')
         expect(result).toBeTruthy()
-        expect(result?.type).toBe('sql')
-        expect(result?.name).toBe('users-sql')
+        expect(result?.type).toBe('query')
+        expect(result?.name).toBe('users-query')
       })
 
       it('should detect files in sql/ directory', () => {
         const result = detector.detectComponent('sql/migrations/001.sql')
         expect(result).toBeTruthy()
-        expect(result?.type).toBe('sql')
+        expect(result?.type).toBe('query')
       })
 
       it('should detect files in database/ directory', () => {
         const result = detector.detectComponent('database/schema.sql')
         expect(result).toBeTruthy()
-        expect(result?.type).toBe('sql')
+        expect(result?.type).toBe('query')
       })
 
       it('should detect .sql extension files', () => {
         const result = detector.detectComponent('data/fetch-users.sql')
         expect(result).toBeTruthy()
-        expect(result?.type).toBe('sql')
+        expect(result?.type).toBe('query')
       })
 
       it('should detect files with .query extension', () => {
         const result = detector.detectComponent('analytics/report.query.sql')
         expect(result).toBeTruthy()
-        expect(result?.type).toBe('sql')
+        expect(result?.type).toBe('query')
       })
 
       it('should detect files starting with query', () => {
         const result = detector.detectComponent('query-builder.sql')
         expect(result).toBeTruthy()
-        expect(result?.type).toBe('sql')
+        expect(result?.type).toBe('query')
       })
 
       it('should detect files starting with schema', () => {
         const result = detector.detectComponent('schema-v2.sql')
         expect(result).toBeTruthy()
-        expect(result?.type).toBe('sql')
+        expect(result?.type).toBe('query')
       })
     })
 
@@ -312,8 +325,8 @@ describe('ComponentDetector', () => {
       })
 
       it('should handle files with extensions', () => {
-        const result = detector.detectComponent('agents/worker.js')
-        expect(result?.name).toBe('worker-agent')
+        const result = detector.detectComponent('workers/processor.agent.js')
+        expect(result?.name).toBe('processor-script')
       })
     })
   })
@@ -321,7 +334,7 @@ describe('ComponentDetector', () => {
   describe('isComponent', () => {
     it('should return true for component files', () => {
       expect(detector.isComponent('prompts/helper.md')).toBe(true)
-      expect(detector.isComponent('agents/worker.js')).toBe(true)
+      expect(detector.isComponent('scripts/worker.js')).toBe(true)
       expect(detector.isComponent('queries/users.sql')).toBe(true)
       expect(detector.isComponent('configs/app.yaml')).toBe(true)
     })
@@ -368,11 +381,11 @@ describe('ComponentDetector', () => {
     it('should allow updating multiple types', () => {
       detector.updatePatterns({
         prompt: ['custom-prompts/**/*'],
-        agent: ['custom-agents/**/*'],
+        script: ['custom-scripts/**/*'],
       })
 
       expect(detector.detectComponent('custom-prompts/helper.md')?.type).toBe('prompt')
-      expect(detector.detectComponent('custom-agents/worker.js')?.type).toBe('agent')
+      expect(detector.detectComponent('custom-scripts/worker.js')?.type).toBe('script')
     })
 
     it('should preserve patterns not being updated', () => {
@@ -380,9 +393,9 @@ describe('ComponentDetector', () => {
         prompt: ['custom/**/*'],
       })
 
-      // SQL patterns should still work
+      // Query patterns should still work
       const result = detector.detectComponent('queries/users.sql')
-      expect(result?.type).toBe('sql')
+      expect(result?.type).toBe('query')
     })
   })
 
@@ -469,9 +482,10 @@ describe('ComponentDetector', () => {
       const types = new Set(patterns.map((p) => p.type))
 
       expect(types.has('prompt')).toBe(true)
-      expect(types.has('agent')).toBe(true)
-      expect(types.has('sql')).toBe(true)
+      expect(types.has('script')).toBe(true)
+      expect(types.has('query')).toBe(true)
       expect(types.has('config')).toBe(true)
+      expect(types.has('agent-definition')).toBe(true)
     })
 
     it('should have consistent confidence values', () => {
@@ -564,17 +578,19 @@ describe('ComponentDetector', () => {
     it('should detect all component types from realistic file structure', () => {
       const files = [
         'prompts/system-prompt.md',
-        'agents/data-processor.ts',
+        'scripts/data-processor.ts',
         'queries/fetch-users.sql',
         'configs/database.yaml',
+        'agents/scraper/agent.yaml',
       ]
 
       const results = files.map((f) => detector.detectComponent(f))
 
       expect(results[0]?.type).toBe('prompt')
-      expect(results[1]?.type).toBe('agent')
-      expect(results[2]?.type).toBe('sql')
+      expect(results[1]?.type).toBe('script')
+      expect(results[2]?.type).toBe('query')
       expect(results[3]?.type).toBe('config')
+      expect(results[4]?.type).toBe('agent-definition')
 
       results.forEach((result) => {
         expect(result).toBeTruthy()
@@ -586,7 +602,7 @@ describe('ComponentDetector', () => {
       const files = [
         'prompts/helper.md', // component
         'src/index.ts', // not component
-        'agents/worker.js', // component
+        'scripts/worker.js', // component
         'README.md', // not component
         'package.json', // component (config)
       ]

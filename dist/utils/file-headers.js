@@ -170,8 +170,8 @@ export class FileHeaderManager {
             return false;
         // Override for potentially unsafe combinations
         const unsafeCombinations = [
-            { ext: '.txt', type: 'sql' }, // .txt file containing SQL should use SQL comments
-            { ext: '.md', type: 'sql' }, // .md file containing SQL should use SQL comments
+            { ext: '.txt', type: 'query' }, // .txt file containing SQL should use SQL comments
+            { ext: '.md', type: 'query' }, // .md file containing SQL should use SQL comments
             { ext: '.txt', type: 'config' }, // .txt file as config might be YAML-like
         ];
         return unsafeCombinations.some((combo) => combo.ext === ext && combo.type === componentType);
@@ -183,7 +183,7 @@ export class FileHeaderManager {
         if (!componentType)
             return null;
         switch (componentType) {
-            case 'sql':
+            case 'query':
                 return {
                     prefix: '-- ',
                     suffix: '',
@@ -195,11 +195,18 @@ export class FileHeaderManager {
                     suffix: '',
                     template: 'Edgit: id={componentId} version={version} component={component}',
                 };
-            case 'agent':
-                // Assume scripts - use /* */ comments
+            case 'script':
+                // Scripts - use /* */ comments
                 return {
                     prefix: '/* ',
                     suffix: ' */',
+                    template: 'Edgit: id={componentId} version={version} component={component}',
+                };
+            case 'agent-definition':
+                // Agent definitions (YAML) - use # comments
+                return {
+                    prefix: '# ',
+                    suffix: '',
                     template: 'Edgit: id={componentId} version={version} component={component}',
                 };
             case 'prompt':

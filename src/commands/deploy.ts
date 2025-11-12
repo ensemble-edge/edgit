@@ -91,6 +91,7 @@ export class DeployCommand extends Command {
         componentName,
         environment,
         sha,
+        'component',
         `Deploy ${componentName}@${version} to ${environment}`
       )
 
@@ -170,6 +171,7 @@ export class DeployCommand extends Command {
         componentName,
         toEnv,
         fromSHA,
+        'component',
         `Promote ${componentName} from ${fromEnv} to ${toEnv}`
       )
 
@@ -282,6 +284,7 @@ export class DeployCommand extends Command {
         componentName,
         environment,
         rollbackSHA,
+        'component',
         `Rollback ${componentName} in ${environment} to ${rollbackVersion}`
       )
 

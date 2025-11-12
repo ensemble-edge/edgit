@@ -21,7 +21,15 @@ export class ComponentDetector {
   private git: GitWrapper
 
   // Component patterns to track (can be customized via registry config)
+  // IMPORTANT: Order matters! More specific patterns should come first
   public patterns: Record<ComponentType, string[]> = {
+    // Agent definitions - must come before config to avoid false matches on .yaml files
+    'agent-definition': [
+      '**/agent.yaml', // Agent definition files
+      '**/agent.yml', // Agent definition files (alternative extension)
+      '**/*.agent.yaml', // Files with .agent.yaml extension
+      '**/*.agent.yml', // Files with .agent.yml extension
+    ],
     prompt: [
       'prompts/**/*', // Any file in prompts/ directory
       '**/prompt*', // Files starting with "prompt"
@@ -30,17 +38,19 @@ export class ComponentDetector {
       'instructions/**/*', // Instructions directory
       'templates/**/*', // Templates directory
     ],
-    agent: [
-      'agents/**/*', // Any file in agents/ directory
+    script: [
       'scripts/**/*.js',
       'scripts/**/*.ts',
       'scripts/**/*.py',
       'scripts/**/*.sh', // Shell scripts
       'scripts/**/*.bash', // Bash scripts
-      '**/*.agent.*', // Files with .agent in name
-      '**/agent*', // Files starting with "agent"
+      '**/*.agent.ts', // TypeScript agent files
+      '**/*.agent.js', // JavaScript agent files
+      '**/*.agent.py', // Python agent files
+      '**/*.script.*', // Files with .script in name
+      '**/script*', // Files starting with "script"
     ],
-    sql: [
+    query: [
       'queries/**/*', // Any file in queries/ directory
       'sql/**/*', // Any file in sql/ directory
       'database/**/*', // Any file in database/ directory

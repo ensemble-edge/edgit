@@ -87,7 +87,7 @@ export class TagCommand extends Command {
      * Create an immutable version tag (v1.0.0)
      */
     async createVersionTag(componentName, version, sha) {
-        const gitTag = await this.tagManager.createVersionTag(componentName, version, sha, `Release ${componentName} ${version}`);
+        const gitTag = await this.tagManager.createVersionTag(componentName, version, 'component', sha, `Release ${componentName} ${version}`);
         console.log(`✅ Created version tag: ${componentName}@${version}`);
         console.log(`   Git tag: ${gitTag}`);
         if (sha) {
@@ -100,7 +100,7 @@ export class TagCommand extends Command {
      */
     async createDeploymentTag(componentName, env, targetRef) {
         const target = targetRef || 'HEAD';
-        const gitTag = await this.tagManager.moveDeploymentTag(componentName, env, target, `Deploy ${componentName} to ${env}`);
+        const gitTag = await this.tagManager.moveDeploymentTag(componentName, env, target, 'component', `Deploy ${componentName} to ${env}`);
         console.log(`✅ ${targetRef ? 'Moved' : 'Created'} deployment tag: ${componentName}@${env}`);
         console.log(`   Git tag: ${gitTag}`);
         console.log(`   Points to: ${target}`);
@@ -220,7 +220,7 @@ export class TagCommand extends Command {
             process.exit(1);
         }
         try {
-            await this.tagManager.deleteTag(componentName, tagName, deleteRemote);
+            await this.tagManager.deleteTag(componentName, tagName, 'component', deleteRemote);
             console.log(`✅ Deleted tag: ${componentName}@${tagName}`);
             if (deleteRemote) {
                 console.log('   Also deleted from remote');
@@ -247,7 +247,7 @@ export class TagCommand extends Command {
                 process.exit(1);
             }
             try {
-                await this.tagManager.pushTags(componentName, undefined, force);
+                await this.tagManager.pushTags(componentName, 'component', undefined, force);
                 console.log(`✅ Pushed tags for ${componentName}`);
             }
             catch (error) {
@@ -261,7 +261,7 @@ export class TagCommand extends Command {
             const componentNames = ComponentUtils.listComponentNames(registry);
             for (const name of componentNames) {
                 try {
-                    await this.tagManager.pushTags(name, undefined, force);
+                    await this.tagManager.pushTags(name, 'component', undefined, force);
                     console.log(`✅ Pushed tags for ${name}`);
                 }
                 catch (error) {
