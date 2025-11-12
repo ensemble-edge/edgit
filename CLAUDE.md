@@ -2,6 +2,54 @@
 
 This file provides guidance to Claude Code (claude.ai/code) and other AI assistants when working with code in this repository.
 
+---
+
+# 🚨 CRITICAL: RELEASE WORKFLOW - READ THIS FIRST 🚨
+
+## Standard Changesets Workflow (Official)
+
+This project uses the **official** [changesets/action](https://github.com/changesets/action) for automated releases.
+
+### Normal Development Flow
+
+1. **Create changeset** for your changes:
+   ```bash
+   npx changeset add
+   # Or manually create .changeset/my-feature.md
+   ```
+
+2. **Commit and push**:
+   ```bash
+   git add -A
+   git commit -m "feat: description"
+   git push
+   ```
+
+3. **GitHub Actions creates/updates "Version Packages" PR**:
+   - PR contains all version bumps and CHANGELOG updates
+   - Multiple changesets accumulate in one PR
+   - Review the PR to see what will be released
+
+4. **When ready to release, merge the "Version Packages" PR**:
+   - Action automatically publishes to npm
+   - Creates GitHub release
+   - Updates package.json and CHANGELOG.md
+   - All coordination handled automatically
+
+## Benefits
+✅ **Industry standard** - Official Changesets workflow
+✅ **Zero conflicts** - PR-based coordination
+✅ **Full control** - You decide when to release (by merging PR)
+✅ **Batched releases** - Multiple changes in one release
+✅ **Automatic cleanup** - Changesets deleted on merge
+
+## Never Do These:
+- ❌ **DO NOT manually edit package.json or CHANGELOG.md**
+- ❌ **DO NOT manually create or delete tags**
+- ❌ **DO NOT merge Version Packages PR if tests are failing**
+
+---
+
 ## ⚠️ Important: Local Planning Directory
 
 **When creating planning documents, phase summaries, TODO lists, or any working notes, ALWAYS place them in the `.planning/` directory.**
@@ -382,14 +430,15 @@ git push
 **Step 3: Automation Takes Over** (GitHub Actions)
 
 Once you push to main/master, the release workflow automatically:
-1. ✅ Runs tests, lint, and build
+1. ✅ Runs tests, lint, typecheck, and build
 2. ✅ Detects changeset exists
-3. ✅ Runs `changeset version` (bumps package.json, updates CHANGELOG.md)
+3. ✅ Runs `changeset version` (bumps package.json, updates CHANGELOG.md locally)
 4. ✅ Rebuilds with new version
-5. ✅ Commits with message: `chore: release v0.3.0`
-6. ✅ Creates git tag: `v0.3.0`
-7. ✅ Pushes commit and tag to GitHub
-8. ✅ Publishes to npm automatically
+5. ✅ Publishes to npm
+6. ✅ Creates git tag and pushes it
+7. ✅ Creates GitHub release
+8. ✅ Commits with message: `chore: release v0.3.0 [skip ci]` (only after npm publish succeeds)
+9. ✅ Pushes version commit to GitHub
 
 #### Complete Example
 
