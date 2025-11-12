@@ -73,12 +73,7 @@ export class GitTagManager {
    * @param sha Optional SHA to tag (defaults to HEAD)
    * @param message Optional tag message
    */
-  async tagAgent(
-    agent: string,
-    tagName: string,
-    sha?: string,
-    message?: string
-  ): Promise<string> {
+  async tagAgent(agent: string, tagName: string, sha?: string, message?: string): Promise<string> {
     return this.tag(agent, tagName, 'agent', sha, message)
   }
 
@@ -126,7 +121,11 @@ export class GitTagManager {
    * @param entityType Entity type ('component' or 'agent')
    * @returns SHA hash
    */
-  async getTagSHA(name: string, tagName: string, entityType: EntityType = 'component'): Promise<string> {
+  async getTagSHA(
+    name: string,
+    tagName: string,
+    entityType: EntityType = 'component'
+  ): Promise<string> {
     const namespace = this.getNamespace(entityType)
     const gitTag = `${namespace}/${name}/${tagName}`
     const result = await this.git.exec(['rev-list', '-n', '1', gitTag])
@@ -145,7 +144,11 @@ export class GitTagManager {
    * @param entityType Entity type ('component' or 'agent')
    * @returns True if tag exists
    */
-  async tagExists(name: string, tagName: string, entityType: EntityType = 'component'): Promise<boolean> {
+  async tagExists(
+    name: string,
+    tagName: string,
+    entityType: EntityType = 'component'
+  ): Promise<boolean> {
     try {
       await this.getTagSHA(name, tagName, entityType)
       return true
@@ -220,7 +223,11 @@ export class GitTagManager {
    * @param entityType Entity type ('component' or 'agent')
    * @returns SHA hash
    */
-  async resolveRef(name: string, ref: string, entityType: EntityType = 'component'): Promise<string> {
+  async resolveRef(
+    name: string,
+    ref: string,
+    entityType: EntityType = 'component'
+  ): Promise<string> {
     // If it looks like a SHA, try to resolve it directly
     if (ref.match(/^[0-9a-f]{6,40}$/i)) {
       const result = await this.git.exec(['rev-parse', ref])
