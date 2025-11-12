@@ -27,9 +27,9 @@ describe('edgit components', () => {
     expect(result.stdout).toContain('helper-prompt')
   })
 
-  it('should detect agent components', async () => {
-    await repo.writeFile('agents/processor.agent.ts', '// Agent code\nexport {}')
-    await repo.commit('Add agent')
+  it('should detect script components', async () => {
+    await repo.writeFile('agents/processor.agent.ts', '// Script code\nexport {}')
+    await repo.commit('Add script')
 
     // Run init to detect components
     await repo.runEdgit(['init'])
@@ -37,7 +37,7 @@ describe('edgit components', () => {
     const result = await repo.runEdgit(['components', 'list'])
 
     expect(result.exitCode).toBe(0)
-    expect(result.stdout).toContain('processor-agent')
+    expect(result.stdout).toContain('processor-script')
   })
 
   it('should detect SQL components', async () => {

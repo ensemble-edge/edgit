@@ -67,12 +67,14 @@ class OpenAIProvider implements AIProvider {
     switch (type) {
       case 'prompt':
         return PROMPT_TEMPLATES.componentPrompt
-      case 'agent':
-        return PROMPT_TEMPLATES.componentAgent
-      case 'sql':
-        return PROMPT_TEMPLATES.componentSQL
+      case 'script':
+        return PROMPT_TEMPLATES.componentScript
+      case 'query':
+        return PROMPT_TEMPLATES.componentQuery
       case 'config':
         return PROMPT_TEMPLATES.componentConfig
+      case 'agent-definition':
+        return PROMPT_TEMPLATES.componentAgentDefinition
       default:
         return PROMPT_TEMPLATES.componentPrompt
     }
@@ -265,7 +267,7 @@ Be specific about:
 
 One clear sentence describing the change, no prefix or component name.`,
 
-  componentAgent: `Describe what changed in this agent code:
+  componentScript: `Describe what changed in this script:
 
 \${diff}
 
@@ -277,7 +279,7 @@ Focus on:
 
 One clear sentence describing the change, no prefix.`,
 
-  componentSQL: `Describe this SQL query change:
+  componentQuery: `Describe this SQL query change:
 
 \${diff}
 
@@ -298,6 +300,18 @@ Focus on:
 - Parameter adjustments
 - Feature toggles
 - Performance tuning
+
+One clear sentence describing the change, no prefix.`,
+
+  componentAgentDefinition: `Describe what changed in this agent definition:
+
+\${diff}
+
+Focus on:
+- Agent operation or behavior changes
+- Input/output modifications
+- Component or tool integrations
+- Configuration updates
 
 One clear sentence describing the change, no prefix.`,
 }

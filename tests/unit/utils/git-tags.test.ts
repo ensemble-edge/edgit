@@ -109,7 +109,7 @@ describe('GitTagManager', () => {
       await tagManager.tagComponent('my-prompt', 'v1.0.0')
 
       expect(mockGit.exec).toHaveBeenCalledWith(
-        expect.arrayContaining(['-m', 'Tag my-prompt as v1.0.0'])
+        expect.arrayContaining(['-m', 'Tag component my-prompt as v1.0.0'])
       )
     })
 
@@ -520,7 +520,7 @@ describe('GitTagManager', () => {
       await tagManager.createVersionTag('my-prompt', 'v1.0.0')
 
       expect(mockGit.exec).toHaveBeenLastCalledWith(
-        expect.arrayContaining(['-m', 'Release my-prompt v1.0.0'])
+        expect.arrayContaining(['-m', 'Release component my-prompt v1.0.0'])
       )
     })
   })
@@ -580,7 +580,7 @@ describe('GitTagManager', () => {
       await tagManager.moveDeploymentTag('my-prompt', 'prod', 'v1.0.0')
 
       expect(mockGit.exec).toHaveBeenLastCalledWith(
-        expect.arrayContaining(['-m', 'Deploy my-prompt to prod'])
+        expect.arrayContaining(['-m', 'Deploy component my-prompt to prod'])
       )
     })
   })

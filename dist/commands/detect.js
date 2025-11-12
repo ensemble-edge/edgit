@@ -119,16 +119,18 @@ Examples:
         // High confidence indicators
         const highConfidencePatterns = {
             prompt: [/prompt/, /instruction/, /system/, /template/],
-            agent: [/agent/, /assistant/, /bot/, /workflow/],
-            sql: [/query/, /schema/, /migration/, /view/, /procedure/],
+            script: [/script/, /assistant/, /bot/, /workflow/],
+            query: [/query/, /schema/, /migration/, /view/, /procedure/],
             config: [/config/, /settings/, /env/, /props/],
+            'agent-definition': [/agent\.ya?ml/, /agents\/.*\/agent\.ya?ml/],
         };
         // Medium confidence indicators
         const mediumConfidencePatterns = {
             prompt: [/\.md$/, /readme/, /doc/, /prompts/],
-            agent: [/\.py$/, /\.js$/, /\.ts$/, /agents/, /scripts/],
-            sql: [/\.sql$/, /queries/, /database/],
+            script: [/\.py$/, /\.js$/, /\.ts$/, /scripts/],
+            query: [/\.sql$/, /queries/, /database/],
             config: [/\.json$/, /\.yaml$/, /\.yml$/, /configs?/],
+            'agent-definition': [/agents\//, /\.agent\.ya?ml/],
         };
         // Check high confidence patterns
         const highPatterns = highConfidencePatterns[type];
@@ -218,11 +220,14 @@ Examples:
         if (detected.type === 'prompt' && ext === '.md') {
             recommendations.push('💡 Tip: Consider organizing prompts in prompts/ directory');
         }
-        else if (detected.type === 'agent' && (ext === '.py' || ext === '.js' || ext === '.ts')) {
-            recommendations.push('💡 Tip: Document agent interfaces in comments for better versioning');
+        else if (detected.type === 'script' && (ext === '.py' || ext === '.js' || ext === '.ts')) {
+            recommendations.push('💡 Tip: Document script interfaces in comments for better versioning');
         }
-        else if (detected.type === 'sql' && ext === '.sql') {
+        else if (detected.type === 'query' && ext === '.sql') {
             recommendations.push('💡 Tip: Include schema dependencies in comments');
+        }
+        else if (detected.type === 'agent-definition' && (ext === '.yaml' || ext === '.yml')) {
+            recommendations.push('💡 Tip: Version agent definitions independently from their components');
         }
         else if (detected.type === 'config') {
             recommendations.push('💡 Tip: Consider environment-specific configurations');

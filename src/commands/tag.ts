@@ -102,6 +102,7 @@ export class TagCommand extends Command {
     const gitTag = await this.tagManager.createVersionTag(
       componentName,
       version,
+      'component',
       sha,
       `Release ${componentName} ${version}`
     )
@@ -126,6 +127,7 @@ export class TagCommand extends Command {
       componentName,
       env,
       target,
+      'component',
       `Deploy ${componentName} to ${env}`
     )
 
@@ -278,7 +280,7 @@ export class TagCommand extends Command {
     }
 
     try {
-      await this.tagManager.deleteTag(componentName, tagName, deleteRemote)
+      await this.tagManager.deleteTag(componentName, tagName, 'component', deleteRemote)
       console.log(`✅ Deleted tag: ${componentName}@${tagName}`)
 
       if (deleteRemote) {
@@ -309,7 +311,7 @@ export class TagCommand extends Command {
       }
 
       try {
-        await this.tagManager.pushTags(componentName, undefined, force)
+        await this.tagManager.pushTags(componentName, 'component', undefined, force)
         console.log(`✅ Pushed tags for ${componentName}`)
       } catch (error) {
         console.error(`❌ Failed to push tags: ${error instanceof Error ? error.message : error}`)
@@ -322,7 +324,7 @@ export class TagCommand extends Command {
 
       for (const name of componentNames) {
         try {
-          await this.tagManager.pushTags(name, undefined, force)
+          await this.tagManager.pushTags(name, 'component', undefined, force)
           console.log(`✅ Pushed tags for ${name}`)
         } catch (error) {
           console.warn(

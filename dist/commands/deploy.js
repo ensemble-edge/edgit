@@ -71,7 +71,7 @@ export class DeployCommand extends Command {
             // Resolve version to SHA
             const sha = await this.tagManager.resolveRef(componentName, version);
             // Move deployment tag to this SHA
-            const gitTag = await this.tagManager.moveDeploymentTag(componentName, environment, sha, `Deploy ${componentName}@${version} to ${environment}`);
+            const gitTag = await this.tagManager.moveDeploymentTag(componentName, environment, sha, 'component', `Deploy ${componentName}@${version} to ${environment}`);
             console.log(`✅ Deployed ${componentName}@${version} to ${environment}`);
             console.log(`   Git tag: ${gitTag} → ${sha.substring(0, 8)}`);
             // Show what's now deployed with the specific version that was deployed
@@ -132,7 +132,7 @@ export class DeployCommand extends Command {
                 }
             }
             // Move target environment tag to same SHA
-            const gitTag = await this.tagManager.moveDeploymentTag(componentName, toEnv, fromSHA, `Promote ${componentName} from ${fromEnv} to ${toEnv}`);
+            const gitTag = await this.tagManager.moveDeploymentTag(componentName, toEnv, fromSHA, 'component', `Promote ${componentName} from ${fromEnv} to ${toEnv}`);
             console.log(`✅ Promoted ${componentName} from ${fromEnv} to ${toEnv}`);
             console.log(`   Version: ${versionInfo}`);
             console.log(`   SHA: ${fromSHA.substring(0, 8)}`);
@@ -225,7 +225,7 @@ export class DeployCommand extends Command {
                 rollbackSHA = await this.tagManager.getTagSHA(componentName, rollbackVersion);
             }
             // Move deployment tag to rollback SHA
-            const gitTag = await this.tagManager.moveDeploymentTag(componentName, environment, rollbackSHA, `Rollback ${componentName} in ${environment} to ${rollbackVersion}`);
+            const gitTag = await this.tagManager.moveDeploymentTag(componentName, environment, rollbackSHA, 'component', `Rollback ${componentName} in ${environment} to ${rollbackVersion}`);
             console.log(`✅ Rolled back ${componentName} in ${environment} to ${rollbackVersion}`);
             console.log(`   SHA: ${rollbackSHA.substring(0, 8)}`);
             console.log(`   Git tag: ${gitTag}`);
