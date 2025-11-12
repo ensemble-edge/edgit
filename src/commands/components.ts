@@ -131,9 +131,7 @@ export class ComponentsCommand extends Command {
 
     // Filter by type
     if (typeFilter) {
-      componentEntries = componentEntries.filter(
-        ({ component }) => component.type === typeFilter
-      )
+      componentEntries = componentEntries.filter(({ component }) => component.type === typeFilter)
     }
 
     // Filter by tag status
@@ -414,7 +412,9 @@ export class ComponentsCommand extends Command {
               try {
                 const depSHA = await this.tagManager.getTagSHA(name, depTag)
                 if (process.env.DEBUG) {
-                  console.error(`  [DEBUG] Comparing: version ${version} SHA=${tagInfo.sha} vs ${depTag} SHA=${depSHA}`)
+                  console.error(
+                    `  [DEBUG] Comparing: version ${version} SHA=${tagInfo.sha} vs ${depTag} SHA=${depSHA}`
+                  )
                 }
                 if (depSHA === tagInfo.sha) {
                   deployedAs.push(depTag)
@@ -737,7 +737,9 @@ export class ComponentsCommand extends Command {
         console.log(`   Type: ${component.type}`)
         console.log(`   Path: ${component.path}`)
         console.log(`   Latest: ${latestVersion}`)
-        console.log(`   Versions: ${allVersionTags.length}${limit ? ` (showing ${versionTags.length})` : ''}`)
+        console.log(
+          `   Versions: ${allVersionTags.length}${limit ? ` (showing ${versionTags.length})` : ''}`
+        )
 
         if (deploymentTags.length > 0) {
           console.log(`   Deployments: ${deploymentTags.join(', ')}`)
@@ -745,7 +747,9 @@ export class ComponentsCommand extends Command {
       } else {
         const deployInfo = deploymentTags.length > 0 ? ` [${deploymentTags.join(',')}]` : ''
         const limitInfo = limit && allVersionTags.length > limit ? ` (showing ${limit})` : ''
-        console.log(`   📦 ${name}: ${latestVersion} (${allVersionTags.length} versions${limitInfo})${deployInfo}`)
+        console.log(
+          `   📦 ${name}: ${latestVersion} (${allVersionTags.length} versions${limitInfo})${deployInfo}`
+        )
       }
     } catch (error) {
       // Fallback if Git tag operations fail
