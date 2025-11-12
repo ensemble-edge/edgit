@@ -103,6 +103,26 @@ See [.planning/README.md](.planning/README.md) for full details.
 - **TODO**: Prettier configuration needed
 - TypeScript strict mode IS enabled (`tsconfig.json`)
 
+### Pre-Commit Checklist
+**Before committing and pushing code, ALWAYS run:**
+```bash
+npm run build         # Build TypeScript
+npm run typecheck     # Check TypeScript types (if available)
+npm test              # Run all tests (160 tests)
+```
+
+**Note:** Once ESLint/Prettier are configured, also run:
+```bash
+npm run format        # Auto-fix formatting issues
+npm run format:check  # Verify formatting is correct
+npm run lint          # Check code quality
+```
+
+**Why this matters:**
+- CI will fail if types/tests don't pass
+- Running these locally saves time and prevents CI failures
+- Catches issues before they reach the pipeline
+
 ### Git Operations
 ```bash
 # This is a Git wrapper CLI - all commands interact with Git
