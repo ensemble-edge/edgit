@@ -71,6 +71,16 @@ export class ComponentDetector {
       '**/*.ini', // INI files
       '**/config*', // Files starting with "config"
     ],
+    schema: [
+      'schemas/**/*', // Any file in schemas/ directory
+      'schema/**/*', // Any file in schema/ directory
+      '**/*.schema.json', // JSON Schema files
+      '**/*.schema.yaml', // YAML Schema files
+      '**/*.schema.yml', // YML Schema files
+      '**/schema*', // Files starting with "schema"
+      'types/**/*.json', // Type definition JSONs
+      'validation/**/*', // Validation directory
+    ],
   }
 
   constructor(git?: GitWrapper) {
