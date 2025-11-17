@@ -65,7 +65,7 @@ components/sql-query/v1.0.0        ← Portal to the working version
 
 ## About
 
-Edgit wraps Git to add component-level and agent-level versioning while maintaining 100% Git compatibility. Every prompt, script, query, config, and agent definition gets its own version automatically. Components are versioned artifacts used by agents. Agents are versioned workers that consume components. Zero learning curve - your git commands just get smarter.
+Edgit wraps Git to add component-level and agent-level versioning while maintaining 100% Git compatibility. Every prompt, script, query, config, schema, and agent definition gets its own version automatically. Components are versioned artifacts used by agents. Agents are versioned workers that consume components. Zero learning curve - your git commands just get smarter.
 
 ## Why Now? The Perfect Storm
 
