@@ -192,6 +192,7 @@ Examples:
       query: [/query/, /schema/, /migration/, /view/, /procedure/],
       config: [/config/, /settings/, /env/, /props/],
       'agent-definition': [/agent\.ya?ml/, /agents\/.*\/agent\.ya?ml/],
+      schema: [/schema/, /\.schema\.json$/, /schemas\//],
     }
 
     // Medium confidence indicators
@@ -200,6 +201,7 @@ Examples:
       script: [/\.py$/, /\.js$/, /\.ts$/, /scripts/],
       query: [/\.sql$/, /queries/, /database/],
       config: [/\.json$/, /\.yaml$/, /\.yml$/, /configs?/],
+      schema: [/\.json$/, /validation/, /types/],
       'agent-definition': [/agents\//, /\.agent\.ya?ml/],
     }
 
