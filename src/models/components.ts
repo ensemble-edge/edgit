@@ -5,7 +5,7 @@
 
 import { ComponentNameGenerator } from '../utils/component-name-generator.js'
 
-export type ComponentType = 'prompt' | 'query' | 'config' | 'script' | 'agent-definition'
+export type ComponentType = 'prompt' | 'query' | 'config' | 'script' | 'agent-definition' | 'schema'
 
 /**
  * Minimal component definition - only static manifest data
