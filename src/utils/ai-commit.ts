@@ -65,6 +65,8 @@ class OpenAIProvider implements AIProvider {
 
   private getComponentTemplate(type: ComponentType): string {
     switch (type) {
+      case 'template':
+        return PROMPT_TEMPLATES.componentTemplate
       case 'prompt':
         return PROMPT_TEMPLATES.componentPrompt
       case 'script':
@@ -73,6 +75,8 @@ class OpenAIProvider implements AIProvider {
         return PROMPT_TEMPLATES.componentQuery
       case 'config':
         return PROMPT_TEMPLATES.componentConfig
+      case 'schema':
+        return PROMPT_TEMPLATES.componentSchema
       case 'agent-definition':
         return PROMPT_TEMPLATES.componentAgentDefinition
       default:
@@ -256,13 +260,25 @@ Maximum 72 characters. Be specific about functionality, not just component types
 Format: type(\${componentName}): description
 Keep it under 72 characters. Focus on the main change.`,
 
+  componentTemplate: `Describe what changed in this template:
+
+\${diff}
+
+Focus on:
+- New HTML/markup structure
+- Styling or layout changes
+- Dynamic variable updates
+- Template engine features
+
+One clear sentence describing the change, no prefix.`,
+
   componentPrompt: `Describe what changed in this AI prompt component:
 
 \${diff}
 
 Be specific about:
 - New patterns or instructions added
-- Improvements to existing guidance  
+- Improvements to existing guidance
 - Constraints or formatting changes
 
 One clear sentence describing the change, no prefix or component name.`,
@@ -300,6 +316,18 @@ Focus on:
 - Parameter adjustments
 - Feature toggles
 - Performance tuning
+
+One clear sentence describing the change, no prefix.`,
+
+  componentSchema: `Describe what changed in this JSON Schema:
+
+\${diff}
+
+Focus on:
+- New fields or properties
+- Validation rule changes
+- Type constraints
+- Required field updates
 
 One clear sentence describing the change, no prefix.`,
 
