@@ -27,7 +27,7 @@ describe('ComponentDetector', () => {
       it('should detect files in templates/ directory', () => {
         const result = detector.detectComponent('templates/email.html')
         expect(result).toBeTruthy()
-        expect(result?.type).toBe('prompt')
+        expect(result?.type).toBe('template')
       })
 
       it('should detect files in instructions/ directory', () => {
