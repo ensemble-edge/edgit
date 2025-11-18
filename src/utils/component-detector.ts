@@ -30,13 +30,23 @@ export class ComponentDetector {
       '**/*.agent.yaml', // Files with .agent.yaml extension
       '**/*.agent.yml', // Files with .agent.yml extension
     ],
+    template: [
+      'templates/**/*', // Any file in templates/ directory
+      '**/*.template.*', // Files with .template in name
+      '**/*.hbs', // Handlebars templates
+      '**/*.handlebars', // Handlebars templates
+      '**/*.mjml', // MJML email templates
+      '**/*.liquid', // Liquid templates
+      '**/*.mustache', // Mustache templates
+      '**/*.ejs', // EJS templates
+      '**/template*', // Files starting with "template"
+    ],
     prompt: [
       'prompts/**/*', // Any file in prompts/ directory
       '**/prompt*', // Files starting with "prompt"
       '**/*prompt*', // Files containing "prompt"
       '**/*.prompt.*', // Files with .prompt in name
       'instructions/**/*', // Instructions directory
-      'templates/**/*', // Templates directory
     ],
     script: [
       'scripts/**/*.js',

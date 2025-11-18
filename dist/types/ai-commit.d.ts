@@ -3,7 +3,7 @@
  */
 export type AIMode = 'auto' | 'enhance' | 'off';
 export type AIProviderName = 'openai';
-export type ComponentType = 'prompt' | 'query' | 'config' | 'script' | 'agent-definition';
+export type ComponentType = 'template' | 'prompt' | 'query' | 'config' | 'script' | 'schema' | 'agent-definition';
 export interface AIConfig {
     mode: AIMode;
     provider: AIProviderName;
@@ -41,10 +41,12 @@ export interface AIResponse {
 export interface PromptTemplates {
     repoMultiComponent: string;
     repoSingleComponent: string;
+    componentTemplate: string;
     componentPrompt: string;
     componentScript: string;
     componentQuery: string;
     componentConfig: string;
+    componentSchema: string;
     componentAgentDefinition: string;
 }
 //# sourceMappingURL=ai-commit.d.ts.map

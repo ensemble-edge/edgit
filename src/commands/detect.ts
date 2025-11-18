@@ -187,21 +187,23 @@ Examples:
 
     // High confidence indicators
     const highConfidencePatterns: Record<ComponentType, RegExp[]> = {
-      prompt: [/prompt/, /instruction/, /system/, /template/],
+      template: [/\.hbs$/, /\.handlebars$/, /\.mjml$/, /\.liquid$/, /templates\//],
+      prompt: [/prompt/, /instruction/, /system/],
       script: [/script/, /assistant/, /bot/, /workflow/],
-      query: [/query/, /schema/, /migration/, /view/, /procedure/],
+      query: [/query/, /migration/, /view/, /procedure/],
       config: [/config/, /settings/, /env/, /props/],
+      schema: [/\.schema\.json$/, /\.schema\.ya?ml$/, /schemas\//],
       'agent-definition': [/agent\.ya?ml/, /agents\/.*\/agent\.ya?ml/],
-      schema: [/schema/, /\.schema\.json$/, /schemas\//],
     }
 
     // Medium confidence indicators
     const mediumConfidencePatterns: Record<ComponentType, RegExp[]> = {
+      template: [/\.mustache$/, /\.ejs$/, /\.template\./, /template/],
       prompt: [/\.md$/, /readme/, /doc/, /prompts/],
       script: [/\.py$/, /\.js$/, /\.ts$/, /scripts/],
       query: [/\.sql$/, /queries/, /database/],
       config: [/\.json$/, /\.yaml$/, /\.yml$/, /configs?/],
-      schema: [/\.json$/, /validation/, /types/],
+      schema: [/\.json$/, /validation/, /types/, /schema/],
       'agent-definition': [/agents\//, /\.agent\.ya?ml/],
     }
 

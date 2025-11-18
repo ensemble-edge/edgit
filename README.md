@@ -288,11 +288,11 @@ const template = await componentLoader.load(
 Conductor's ComponentLoader supports multiple protocols powered by Edgit:
 
 - `template://` - HTML/Email/PDF templates
-- `prompt://` - AI prompts for Think members
-- `query://` - SQL queries for Data members
+- `prompt://` - AI prompts for Think agents
+- `script://` - JavaScript/TypeScript code for Code agents
+- `query://` - SQL queries for Data agents
 - `config://` - Configuration objects
-- `form://` - Form definitions (coming soon)
-- `page://` - Full page components (coming soon)
+- `schema://` - JSON Schema definitions
 
 All protocols use the same URI format: `{protocol}://{path}[@{version}]`
 

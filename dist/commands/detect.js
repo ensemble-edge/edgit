@@ -118,18 +118,22 @@ Examples:
         const dirname = path.dirname(file).toLowerCase();
         // High confidence indicators
         const highConfidencePatterns = {
-            prompt: [/prompt/, /instruction/, /system/, /template/],
+            template: [/\.hbs$/, /\.handlebars$/, /\.mjml$/, /\.liquid$/, /templates\//],
+            prompt: [/prompt/, /instruction/, /system/],
             script: [/script/, /assistant/, /bot/, /workflow/],
-            query: [/query/, /schema/, /migration/, /view/, /procedure/],
+            query: [/query/, /migration/, /view/, /procedure/],
             config: [/config/, /settings/, /env/, /props/],
+            schema: [/\.schema\.json$/, /\.schema\.ya?ml$/, /schemas\//],
             'agent-definition': [/agent\.ya?ml/, /agents\/.*\/agent\.ya?ml/],
         };
         // Medium confidence indicators
         const mediumConfidencePatterns = {
+            template: [/\.mustache$/, /\.ejs$/, /\.template\./, /template/],
             prompt: [/\.md$/, /readme/, /doc/, /prompts/],
             script: [/\.py$/, /\.js$/, /\.ts$/, /scripts/],
             query: [/\.sql$/, /queries/, /database/],
             config: [/\.json$/, /\.yaml$/, /\.yml$/, /configs?/],
+            schema: [/\.json$/, /validation/, /types/, /schema/],
             'agent-definition': [/agents\//, /\.agent\.ya?ml/],
         };
         // Check high confidence patterns
