@@ -4,7 +4,14 @@
 
 export type AIMode = 'auto' | 'enhance' | 'off'
 export type AIProviderName = 'openai' // Room for 'anthropic', 'gemini', etc.
-export type ComponentType = 'template' | 'prompt' | 'query' | 'config' | 'script' | 'schema' | 'agent-definition'
+export type ComponentType =
+  | 'template'
+  | 'prompt'
+  | 'query'
+  | 'config'
+  | 'script'
+  | 'schema'
+  | 'agent-definition'
 
 export interface AIConfig {
   mode: AIMode
