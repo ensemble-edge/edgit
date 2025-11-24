@@ -1,6 +1,6 @@
 {
   "name": "@ensemble-edge/edgit",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "description": "Git tag-based versioning for AI components and agents. Independent versioning for prompts, configs, queries, scripts, and agent definitions.",
   "main": "dist/index.js",
