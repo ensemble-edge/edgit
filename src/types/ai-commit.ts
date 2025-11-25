@@ -12,6 +12,7 @@ export type ComponentType =
   | 'script'
   | 'schema'
   | 'agent-definition'
+  | 'ensemble'
 
 export interface AIConfig {
   mode: AIMode
