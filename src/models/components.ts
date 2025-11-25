@@ -13,6 +13,7 @@ export type ComponentType =
   | 'script'
   | 'schema'
   | 'agent-definition'
+  | 'ensemble'
 
 /**
  * Minimal component definition - only static manifest data
