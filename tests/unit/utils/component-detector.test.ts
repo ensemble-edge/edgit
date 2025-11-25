@@ -93,6 +93,44 @@ describe('ComponentDetector', () => {
       })
     })
 
+    describe('ensemble detection', () => {
+      it('should detect TypeScript ensemble files in ensembles/ directory', () => {
+        const result = detector.detectComponent('ensembles/my-workflow.ts')
+        expect(result).toBeTruthy()
+        expect(result?.type).toBe('ensemble')
+      })
+
+      it('should detect YAML ensemble files in ensembles/ directory', () => {
+        const result = detector.detectComponent('ensembles/data-pipeline.yaml')
+        expect(result).toBeTruthy()
+        expect(result?.type).toBe('ensemble')
+      })
+
+      it('should detect .yml ensemble files in ensembles/ directory', () => {
+        const result = detector.detectComponent('ensembles/rag-pipeline.yml')
+        expect(result).toBeTruthy()
+        expect(result?.type).toBe('ensemble')
+      })
+
+      it('should detect nested ensemble files', () => {
+        const result = detector.detectComponent('ensembles/workflows/advanced-workflow.ts')
+        expect(result).toBeTruthy()
+        expect(result?.type).toBe('ensemble')
+      })
+
+      it('should detect files with .ensemble.ts extension', () => {
+        const result = detector.detectComponent('src/my-pipeline.ensemble.ts')
+        expect(result).toBeTruthy()
+        expect(result?.type).toBe('ensemble')
+      })
+
+      it('should detect files with .ensemble.yaml extension', () => {
+        const result = detector.detectComponent('workflows/data.ensemble.yaml')
+        expect(result).toBeTruthy()
+        expect(result?.type).toBe('ensemble')
+      })
+    })
+
     describe('agent-definition detection', () => {
       it('should detect files in agents/ directory', () => {
         const result = detector.detectComponent('agents/processor/agent.yaml')
@@ -108,6 +146,18 @@ describe('ComponentDetector', () => {
 
       it('should detect agent.yml files', () => {
         const result = detector.detectComponent('agents/analyzer/agent.yml')
+        expect(result).toBeTruthy()
+        expect(result?.type).toBe('agent-definition')
+      })
+
+      it('should detect TypeScript agent handler files', () => {
+        const result = detector.detectComponent('agents/scraper/index.ts')
+        expect(result).toBeTruthy()
+        expect(result?.type).toBe('agent-definition')
+      })
+
+      it('should detect TypeScript files in agents directory', () => {
+        const result = detector.detectComponent('agents/processor/handler.ts')
         expect(result).toBeTruthy()
         expect(result?.type).toBe('agent-definition')
       })

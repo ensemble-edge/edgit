@@ -65,7 +65,7 @@ components/sql-query/v1.0.0        ← Portal to the working version
 
 ## About
 
-Edgit wraps Git to add component-level and agent-level versioning while maintaining 100% Git compatibility. Every prompt, script, query, config, schema, and agent definition gets its own version automatically. Components are versioned artifacts used by agents. Agents are versioned workers that consume components. Zero learning curve - your git commands just get smarter.
+Edgit wraps Git to add component-level, agent-level, and ensemble-level versioning while maintaining 100% Git compatibility. Every prompt, script, query, config, schema, agent definition, and ensemble gets its own version automatically. Components are versioned artifacts used by agents. Agents are versioned workers that consume components. Ensembles are versioned workflow definitions that orchestrate agents. Zero learning curve - your git commands just get smarter.
 
 ## Why Now? The Perfect Storm
 
@@ -169,14 +169,15 @@ Edge deployment makes this 100x more critical:
 
 ## Features
 
-- �️ **Git tag-based versioning** - All versions stored as native Git tags
+- 🏷️ **Git tag-based versioning** - All versions stored as native Git tags
 - 🔄 **Zero merge conflicts** - No version data in tracked files
-- 🎯 **Automatic component detection** - Smart file pattern recognition
+- 🎯 **Automatic component detection** - Smart file pattern recognition for prompts, scripts, configs, agents, and ensembles
 - 🤖 **AI-powered commit messages** - OpenAI integration for intelligent commit descriptions
 - 📦 **Independent component versions** - Version and deploy components separately
-- � **Deployment tag management** - Moveable tags for staging, prod, etc.
+- 🎭 **TypeScript ensemble support** - Version TypeScript workflow definitions alongside YAML
+- 🚀 **Deployment tag management** - Moveable tags for staging, prod, etc.
 - ⚡ **Native Git performance** - Zero overhead, pure Git operations
-- � **Immutable version history** - Git tags preserve all versions forever
+- 🔒 **Immutable version history** - Git tags preserve all versions forever
 
 ## Conductor Integration
 
@@ -250,10 +251,43 @@ edgit tag create company-analysis v1.1.0
 edgit deploy set company-analysis v1.1.0 --to production
 ```
 
+### Ensembles in Conductor
+
+Version TypeScript workflow definitions:
+
+```typescript
+// ensembles/company-intel.ts
+import { createEnsemble, step } from '@anthropic/conductor'
+
+export default createEnsemble('company-intel')
+  .addStep(
+    step('analyze')
+      .operation('think')
+      .config({ prompt: 'Analyze the company...' })
+  )
+  .build()
+```
+
+**Workflow:**
+```bash
+# Register TypeScript ensemble in Edgit
+edgit components add company-intel ensembles/company-intel.ts ensemble
+
+# Version it
+edgit tag create company-intel v1.0.0
+
+# Deploy to edge
+edgit deploy set company-intel v1.0.0 --to production
+
+# A/B test versions - old YAML vs new TypeScript
+# ensemble://company-intel@v1.0.0 (YAML)
+# ensemble://company-intel@v2.0.0 (TypeScript)
+```
+
 ### Why Edgit + Conductor?
 
 **Instant Updates at the Edge**
-- Update templates/prompts without rebuilding your application
+- Update templates/prompts/ensembles without rebuilding your application
 - Zero-downtime deployments - new versions load instantly
 - Components cached globally at Cloudflare edge (1-hour TTL default)
 
@@ -293,6 +327,8 @@ Conductor's ComponentLoader supports multiple protocols powered by Edgit:
 - `query://` - SQL queries for Data agents
 - `config://` - Configuration objects
 - `schema://` - JSON Schema definitions
+- `ensemble://` - Workflow definitions (YAML or TypeScript)
+- `agent://` - Agent definitions and handlers
 
 All protocols use the same URI format: `{protocol}://{path}[@{version}]`
 
@@ -387,20 +423,34 @@ components/data-agent/prod         → locked into v2.1.3 stable reality
 
 Edgit automatically detects component realities by file patterns:
 ```bash
+# Ensemble Definitions (NEW!)
+ensembles/**/*.ts    → TypeScript ensemble workflows
+ensembles/**/*.yaml  → YAML ensemble files
+ensembles/**/*.yml   → YAML ensemble files
+**/*.ensemble.ts     → Files with .ensemble.ts extension
+**/*.ensemble.yaml   → Files with .ensemble.yaml extension
+
+# Agent Definitions
+agents/**/agent.yaml  → YAML agent definitions
+agents/**/agent.yml   → YAML agent definitions
+agents/**/index.ts    → TypeScript agent handlers (NEW!)
+agents/**/*.ts        → TypeScript files in agents directory (NEW!)
+**/*.agent.yaml       → Agent files anywhere
+**/*.agent.yml        → Agent files anywhere
+
 # Prompt Components
 prompts/**/*        → prompt component multiverse
 *.prompt.md         → prompt files anywhere
 instructions/**/*   → instruction templates
 templates/**/*      → template files
 
-# Agent Components  
-agents/**/*         → agent component timeline
-scripts/**/*.js     → JavaScript agents
-scripts/**/*.ts     → TypeScript agents  
-scripts/**/*.py     → Python agents
-scripts/**/*.sh     → Shell script agents (NEW!)
-scripts/**/*.bash   → Bash script agents (NEW!)
-*.agent.*          → agent files anywhere
+# Script Components
+scripts/**/*.js     → JavaScript scripts
+scripts/**/*.ts     → TypeScript scripts
+scripts/**/*.py     → Python scripts
+scripts/**/*.sh     → Shell scripts
+scripts/**/*.bash   → Bash scripts
+*.script.*          → Script files anywhere
 
 # SQL Components
 queries/**/*        → sql component reality
@@ -794,27 +844,47 @@ Edgit provides comprehensive error handling with actionable guidance:
 
 ### Enhanced Component Type Detection
 
-**Expanded Agent Support**: Now includes shell scripting support
+**Ensemble Support (NEW)**: TypeScript and YAML workflow definitions
 ```bash
-# All supported agent types
-scripts/**/*.js     → JavaScript agents
-scripts/**/*.ts     → TypeScript agents  
-scripts/**/*.py     → Python agents
-scripts/**/*.sh     → Shell script agents (NEW!)
-scripts/**/*.bash   → Bash script agents (NEW!)
-agents/**/*         → Any file in agents directory
-*.agent.*          → Agent files anywhere
+# Ensemble patterns
+ensembles/**/*.ts    → TypeScript ensembles in ensembles directory
+ensembles/**/*.yaml  → YAML ensembles in ensembles directory
+ensembles/**/*.yml   → YAML ensembles (alternative extension)
+**/*.ensemble.ts     → Files with .ensemble.ts extension
+**/*.ensemble.yaml   → Files with .ensemble.yaml extension
+```
+
+**Expanded Agent Support**: TypeScript handlers and shell scripting
+```bash
+# Agent definition patterns
+agents/**/agent.yaml  → YAML agent definitions
+agents/**/agent.yml   → YAML agent definitions
+agents/**/index.ts    → TypeScript agent handlers (NEW!)
+agents/**/*.ts        → TypeScript files in agents directory (NEW!)
+**/*.agent.yaml       → Agent files anywhere
+**/*.agent.yml        → Agent files anywhere
+```
+
+**Script Components**: Multiple languages supported
+```bash
+# Script patterns
+scripts/**/*.js     → JavaScript scripts
+scripts/**/*.ts     → TypeScript scripts
+scripts/**/*.py     → Python scripts
+scripts/**/*.sh     → Shell scripts
+scripts/**/*.bash   → Bash scripts
+*.script.*          → Script files anywhere
 ```
 
 **Smart Pattern Matching**: Comprehensive file pattern recognition
 ```bash
 # Prompt patterns
 prompts/**/*        → Dedicated prompts directory
-*.prompt.md         → Prompt files anywhere  
+*.prompt.md         → Prompt files anywhere
 instructions/**/*   → Instruction templates
 templates/**/*      → Template files
 
-# Configuration patterns  
+# Configuration patterns
 configs/**/*        → Configuration directories
 settings/**/*       → Settings files
 *.config.*         → Config files with .config. in name
