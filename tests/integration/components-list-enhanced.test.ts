@@ -49,7 +49,8 @@ describe('edgit components list - enhanced features', () => {
     beforeEach(async () => {
       // Create test components
       await repo.writeFile('prompts/extraction.prompt.md', 'Extract data from documents')
-      await repo.writeFile('agents/processor.agent.ts', '// Process data\nexport {}')
+      // Use scripts/ directory for script detection (agents/ would be agent-definition)
+      await repo.writeFile('scripts/processor.ts', '// Process data\nexport {}')
       await repo.commit('Add test components')
       await repo.runEdgit(['init'])
 
@@ -87,10 +88,11 @@ describe('edgit components list - enhanced features', () => {
       expect(extractionPrompt.versions).toEqual(['v1.0.0', 'v1.1.0'])
       expect(extractionPrompt.versionCount).toBe(2)
 
-      // Check processor-script component (now detected as 'script' type)
+      // Check processor-script component (detected as 'script' type from scripts/ dir)
       const processorScript = output.find((c: any) => c.name === 'processor-script')
       expect(processorScript).toBeDefined()
       expect(processorScript.type).toBe('script')
+      expect(processorScript.path).toBe('scripts/processor.ts')
       expect(processorScript.versions).toEqual(['v2.0.0'])
       expect(processorScript.versionCount).toBe(1)
     })
@@ -131,7 +133,8 @@ describe('edgit components list - enhanced features', () => {
       // Create multiple component types
       await repo.writeFile('prompts/test1.prompt.md', 'Prompt 1')
       await repo.writeFile('prompts/test2.prompt.md', 'Prompt 2')
-      await repo.writeFile('agents/agent1.agent.ts', '// Agent 1\nexport {}')
+      // Use scripts/ directory for script detection (agents/ would be agent-definition)
+      await repo.writeFile('scripts/agent1.ts', '// Script 1\nexport {}')
       await repo.writeFile('queries/query1.sql', 'SELECT * FROM users;')
       await repo.commit('Add components')
       await repo.runEdgit(['init'])

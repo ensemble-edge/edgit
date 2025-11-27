@@ -226,7 +226,8 @@ async function showVersion(): Promise<void> {
     const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf-8'))
     console.log(`edgit v${packageJson.version}`)
   } catch {
-    console.log('edgit v0.0.2')
+    // Fallback version if package.json can't be read
+    console.log('edgit v0.2.1')
   }
 }
 

@@ -11,12 +11,24 @@ export class ComponentDetector {
     // Component patterns to track (can be customized via registry config)
     // IMPORTANT: Order matters! More specific patterns should come first
     patterns = {
+        // Ensemble definitions - TypeScript and YAML workflow definitions
+        // Must come before agent-definition to catch ensemble-specific patterns
+        ensemble: [
+            'ensembles/**/*.ts', // TypeScript ensemble files
+            'ensembles/**/*.yaml', // YAML ensemble files
+            'ensembles/**/*.yml', // YAML ensemble files (alternative extension)
+            '**/*.ensemble.ts', // Files with .ensemble.ts extension
+            '**/*.ensemble.yaml', // Files with .ensemble.yaml extension
+            '**/*.ensemble.yml', // Files with .ensemble.yml extension
+        ],
         // Agent definitions - must come before config to avoid false matches on .yaml files
         'agent-definition': [
             '**/agent.yaml', // Agent definition files
             '**/agent.yml', // Agent definition files (alternative extension)
             '**/*.agent.yaml', // Files with .agent.yaml extension
             '**/*.agent.yml', // Files with .agent.yml extension
+            'agents/**/index.ts', // TypeScript agent handler files
+            'agents/**/*.ts', // TypeScript files in agents directory
         ],
         template: [
             'templates/**/*', // Any file in templates/ directory

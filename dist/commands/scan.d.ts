@@ -4,6 +4,8 @@ export interface ScanOptions {
     type?: string | undefined;
     withHeaders?: boolean | undefined;
     trackedOnly?: boolean | undefined;
+    changed?: boolean | undefined;
+    since?: string | undefined;
     output?: 'table' | 'json' | 'simple';
 }
 export interface ScanResult {
@@ -25,6 +27,7 @@ export declare class ScanCommand extends Command {
     private findFilesByPattern;
     private findTrackedFiles;
     private findUntrackedFiles;
+    private findChangedFiles;
     private analyzeFile;
     private isFileRegistered;
     getHelp(): string;
