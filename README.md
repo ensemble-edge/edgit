@@ -257,7 +257,7 @@ Version TypeScript workflow definitions:
 
 ```typescript
 // ensembles/company-intel.ts
-import { createEnsemble, step } from '@anthropic/conductor'
+import { createEnsemble, step } from '@ensemble-edge/conductor'
 
 export default createEnsemble('company-intel')
   .addStep(

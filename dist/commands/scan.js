@@ -42,10 +42,16 @@ export class ScanCommand extends Command {
             type: parsed.options.type,
             withHeaders: parsed.flags['with-headers'],
             trackedOnly: parsed.flags['tracked-only'],
+            changed: parsed.flags['changed'],
+            since: parsed.options.since,
             output: parsed.options.output || 'table',
         };
     }
     async getFilesToScan(options) {
+        if (options.changed) {
+            // Only scan files changed since the last commit (or since a specific ref)
+            return await this.findChangedFiles(options.since);
+        }
         if (options.pattern) {
             // Use custom pattern to find files
             return await this.findFilesByPattern(options.pattern);
@@ -88,6 +94,34 @@ export class ScanCommand extends Command {
         catch (error) {
             console.error('Error listing untracked files:', error);
             return [];
+        }
+    }
+    async findChangedFiles(since) {
+        try {
+            // Determine the base reference
+            const baseRef = since || 'HEAD~1';
+            // Get files changed between baseRef and HEAD
+            const result = await this.git.exec([
+                'diff',
+                '--name-only',
+                '--diff-filter=ACMRT', // Added, Copied, Modified, Renamed, Type changed
+                baseRef,
+                'HEAD',
+            ]);
+            const changedFiles = result.stdout.split('\n').filter((f) => f.trim());
+            // Also include any uncommitted changes (staged and unstaged)
+            const stagedResult = await this.git.exec(['diff', '--name-only', '--cached']);
+            const stagedFiles = stagedResult.stdout.split('\n').filter((f) => f.trim());
+            const unstagedResult = await this.git.exec(['diff', '--name-only']);
+            const unstagedFiles = unstagedResult.stdout.split('\n').filter((f) => f.trim());
+            // Combine all changed files (deduplicated)
+            const allChanged = [...new Set([...changedFiles, ...stagedFiles, ...unstagedFiles])];
+            return allChanged;
+        }
+        catch (error) {
+            // If there's no previous commit, fall back to all tracked files
+            console.warn('Could not determine changed files (possibly first commit), scanning all tracked files');
+            return await this.findTrackedFiles();
         }
     }
     async analyzeFile(file, detector, options) {
@@ -153,17 +187,21 @@ By default, scans all files in the workspace (tracked and untracked).
 
 Options:
   -p, --pattern <glob>    Scan files matching specific pattern
-  -t, --type <type>       Filter by component type (prompt|agent|sql|config)
+  -t, --type <type>       Filter by component type (prompt|agent|sql|config|ensemble)
   --with-headers          Only show files with version headers
   --tracked-only          Only scan git-tracked files (exclude untracked)
+  --changed               Only scan files changed since last commit (useful for CI/CD)
+  --since <ref>           Git ref to compare against (default: HEAD~1). Use with --changed
   -o, --output <format>   Output format: table (default), json, simple
 
 Examples:
-  edgit scan                     # Scan all files (default)
-  edgit scan --type prompt       # Only scan for prompts
-  edgit scan --pattern "*.md"    # Scan only Markdown files
-  edgit scan --tracked-only      # Only scan git-tracked files
-  edgit scan --output json       # JSON output for scripting
+  edgit scan                        # Scan all files (default)
+  edgit scan --type prompt          # Only scan for prompts
+  edgit scan --pattern "*.md"       # Scan only Markdown files
+  edgit scan --tracked-only         # Only scan git-tracked files
+  edgit scan --changed              # Only scan files changed since last commit
+  edgit scan --changed --since main # Only scan files changed since main branch
+  edgit scan --output json          # JSON output for scripting
     `.trim();
     }
     calculateConfidence(file, type) {

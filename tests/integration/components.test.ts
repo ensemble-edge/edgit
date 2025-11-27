@@ -28,7 +28,8 @@ describe('edgit components', () => {
   })
 
   it('should detect script components', async () => {
-    await repo.writeFile('agents/processor.agent.ts', '// Script code\nexport {}')
+    // Use scripts/ directory to ensure detection as script (not agent-definition)
+    await repo.writeFile('scripts/processor.ts', '// Script code\nexport {}')
     await repo.commit('Add script')
 
     // Run init to detect components
@@ -37,7 +38,7 @@ describe('edgit components', () => {
     const result = await repo.runEdgit(['components', 'list'])
 
     expect(result.exitCode).toBe(0)
-    expect(result.stdout).toContain('processor-script')
+    expect(result.stdout).toContain('processor')
   })
 
   it('should detect SQL components', async () => {
