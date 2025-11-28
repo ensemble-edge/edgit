@@ -1,5 +1,22 @@
 # @ensemble-edge/edgit
 
+## 0.3.0
+
+### Minor Changes
+
+- b627536: ## Ensemble & TypeScript Agent Detection
+
+  ### New Features
+  - Add detection support for ensemble YAML files (`ensembles/*.yaml`)
+  - Add detection support for TypeScript agent files (`agents/*.ts`)
+  - Recognize `ensemble:` and `createEnsemble()` patterns for ensemble detection
+  - Recognize `createAgent()` and agent class patterns for TypeScript agents
+  - Improved component discovery for Conductor projects
+
+  ### Improvements
+  - Enhanced component detector to handle new file types
+  - Better integration with Conductor's TypeScript-first SDK
+
 ## 0.2.1
 
 ### Patch Changes
