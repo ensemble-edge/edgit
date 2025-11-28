@@ -1,5 +1,29 @@
 # @ensemble-edge/edgit
 
+## 0.4.0
+
+### Minor Changes
+
+- 14c63a6: ## CI/CD Integration Features
+
+  ### New Features
+  - **`--changed` flag** for `discover scan` - Scan only files changed since last commit
+  - **`--since` flag** for `discover scan` - Specify git ref for comparison (default: HEAD~1)
+  - Enables incremental component scanning in CI/CD pipelines
+
+  ### Example Usage
+
+  ```bash
+  # Scan only changed files in CI
+  edgit discover scan --changed
+
+  # Scan changes since specific commit
+  edgit discover scan --since main
+
+  # Combine with other filters
+  edgit discover scan --changed --type prompt
+  ```
+
 ## 0.3.0
 
 ### Minor Changes
