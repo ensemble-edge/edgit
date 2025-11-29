@@ -14,6 +14,7 @@ export type ComponentType =
   | 'schema'
   | 'agent-definition'
   | 'ensemble'
+  | 'tool' // MCP tools - aligned with Conductor's ComponentType
 
 /**
  * Minimal component definition - only static manifest data

@@ -126,6 +126,7 @@ Examples:
             schema: [/\.schema\.json$/, /\.schema\.ya?ml$/, /schemas\//],
             'agent-definition': [/agent\.ya?ml/, /agents\/.*\/agent\.ya?ml/],
             ensemble: [/ensemble\.ya?ml/, /ensembles\/.*\.ya?ml/, /createEnsemble/],
+            tool: [/\.tool\.ts$/, /\.tool\.ya?ml$/, /tools\//],
         };
         // Medium confidence indicators
         const mediumConfidencePatterns = {
@@ -137,6 +138,7 @@ Examples:
             schema: [/\.json$/, /validation/, /types/, /schema/],
             'agent-definition': [/agents\//, /\.agent\.ya?ml/],
             ensemble: [/ensembles\//, /\.ensemble\./, /orchestrat/],
+            tool: [/tool/, /mcp/, /action/],
         };
         // Check high confidence patterns
         const highPatterns = highConfidencePatterns[type];

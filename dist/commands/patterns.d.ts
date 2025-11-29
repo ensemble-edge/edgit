@@ -6,11 +6,14 @@ export interface PatternsOptions {
     description?: string;
     force?: boolean;
     test?: string;
+    format?: 'table' | 'json';
 }
 /**
  * Patterns command for managing component detection patterns
  */
 export declare class PatternsCommand extends Command {
+    private prompt;
+    constructor(...args: ConstructorParameters<typeof Command>);
     execute(args: string[]): Promise<void>;
     getHelp(): string;
     private extractPatternsOptions;

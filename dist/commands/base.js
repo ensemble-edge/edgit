@@ -3,6 +3,9 @@ import * as path from 'path';
 /**
  * Base command handler for Edgit
  * Provides common functionality and defines the interface for all commands
+ *
+ * Commands receive a GitWrapper instance via constructor injection.
+ * If not provided, a new instance bound to process.cwd() is created.
  */
 export class Command {
     git;
@@ -26,18 +29,21 @@ export class Command {
     ];
     // Commands that should show component-aware information
     static ENHANCED_COMMANDS = ['status', 'log', 'diff'];
+    /**
+     * Create a command with optional dependency injection
+     * @param git - GitWrapper instance (defaults to new instance for process.cwd())
+     * @param detector - Optional component detector
+     */
     constructor(git, detector) {
-        this.git = git || GitWrapper.getInstance();
+        this.git = git || new GitWrapper();
         this.detector = detector;
     }
     /**
-     * Set command context (including workspace directory)
+     * Set command context
+     * Note: The git workspace is immutable - use constructor injection for workspace control
      */
     setContext(context) {
         this.context = context;
-        if (context.workspaceDir && this.git) {
-            this.git.setWorkspaceDir(context.workspaceDir);
-        }
     }
     /**
      * Resolve file path relative to workspace directory
@@ -196,15 +202,17 @@ export class CommandRegistry {
 }
 /**
  * Create command execution context
+ * @param workspaceDir - Optional workspace directory (defaults to process.cwd())
  */
 export async function createCommandContext(workspaceDir) {
-    const git = GitWrapper.getInstance(workspaceDir);
+    const effectiveWorkspace = workspaceDir || process.cwd();
+    const git = new GitWrapper(effectiveWorkspace);
     const cwd = process.cwd();
     // Get repo root in the context of the workspace directory
     const repoRoot = await git.getRepoRoot();
     const context = {
         cwd,
-        workspaceDir: workspaceDir,
+        workspaceDir: effectiveWorkspace,
         env: process.env,
         isCI: Boolean(process.env.CI),
         debug: Boolean(process.env.EDGIT_DEBUG),

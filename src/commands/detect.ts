@@ -1,13 +1,32 @@
 import { Command } from './base.js'
 import { ComponentDetector } from '../utils/component-detector.js'
-import { fileHeaderManager } from '../utils/file-headers.js'
-import { ComponentUtils, type ComponentRegistry, type ComponentType } from '../models/components.js'
+import { fileHeaderManager, type ComponentMetadata } from '../utils/file-headers.js'
+import { ComponentUtils, type ComponentRegistry, type ComponentType, type Component } from '../models/components.js'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 
 export interface DetectOptions {
   output?: 'detailed' | 'json' | 'simple'
   preview?: boolean | undefined
+}
+
+/**
+ * Preview of what would be registered
+ */
+export interface DetectPreview {
+  registryEntry: {
+    name: string
+    type: ComponentType
+    path: string
+    version: string
+    versionHistory: Array<{
+      version: string
+      commit: string
+      timestamp: string
+      message: string
+    }>
+  }
+  headerContent: string
 }
 
 export interface DetectResult {
@@ -29,10 +48,7 @@ export interface DetectResult {
     reason: string
   }
   recommendations: string[]
-  preview?: {
-    registryEntry: any
-    headerContent: string
-  }
+  preview?: DetectPreview
 }
 
 /**
@@ -195,6 +211,7 @@ Examples:
       schema: [/\.schema\.json$/, /\.schema\.ya?ml$/, /schemas\//],
       'agent-definition': [/agent\.ya?ml/, /agents\/.*\/agent\.ya?ml/],
       ensemble: [/ensemble\.ya?ml/, /ensembles\/.*\.ya?ml/, /createEnsemble/],
+      tool: [/\.tool\.ts$/, /\.tool\.ya?ml$/, /tools\//],
     }
 
     // Medium confidence indicators
@@ -207,6 +224,7 @@ Examples:
       schema: [/\.json$/, /validation/, /types/, /schema/],
       'agent-definition': [/agents\//, /\.agent\.ya?ml/],
       ensemble: [/ensembles\//, /\.ensemble\./, /orchestrat/],
+      tool: [/tool/, /mcp/, /action/],
     }
 
     // Check high confidence patterns
@@ -277,7 +295,10 @@ Examples:
     )
   }
 
-  private suggestInitialVersion(filePath: string, headerMetadata?: any): string {
+  private suggestInitialVersion(
+    filePath: string,
+    headerMetadata?: ComponentMetadata | null
+  ): string {
     if (headerMetadata?.version) {
       return headerMetadata.version
     }
@@ -289,7 +310,7 @@ Examples:
   private generateRecommendations(
     filePath: string,
     detected: { type: ComponentType; name: string } | null,
-    headerMetadata: any,
+    headerMetadata: ComponentMetadata | null,
     isRegistered: boolean
   ): string[] {
     const recommendations: string[] = []
@@ -340,7 +361,7 @@ Examples:
     detected: { type: ComponentType; name: string },
     suggestedName: string,
     suggestedVersion: string
-  ): Promise<{ registryEntry: any; headerContent: string }> {
+  ): Promise<DetectPreview> {
     // Generate registry entry preview
     const registryEntry = {
       name: suggestedName,

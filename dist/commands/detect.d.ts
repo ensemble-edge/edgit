@@ -4,6 +4,24 @@ export interface DetectOptions {
     output?: 'detailed' | 'json' | 'simple';
     preview?: boolean | undefined;
 }
+/**
+ * Preview of what would be registered
+ */
+export interface DetectPreview {
+    registryEntry: {
+        name: string;
+        type: ComponentType;
+        path: string;
+        version: string;
+        versionHistory: Array<{
+            version: string;
+            commit: string;
+            timestamp: string;
+            message: string;
+        }>;
+    };
+    headerContent: string;
+}
 export interface DetectResult {
     file: string;
     type: ComponentType | null;
@@ -21,10 +39,7 @@ export interface DetectResult {
         reason: string;
     };
     recommendations: string[];
-    preview?: {
-        registryEntry: any;
-        headerContent: string;
-    };
+    preview?: DetectPreview;
 }
 /**
  * Detect command for detailed analysis of specific files

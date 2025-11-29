@@ -2,7 +2,7 @@
  * Component type definitions for Edgit (Git Tag-Based Versioning)
  * Components are now minimal manifests with all versioning handled by Git tags
  */
-export type ComponentType = 'template' | 'prompt' | 'query' | 'config' | 'script' | 'schema' | 'agent-definition' | 'ensemble';
+export type ComponentType = 'template' | 'prompt' | 'query' | 'config' | 'script' | 'schema' | 'agent-definition' | 'ensemble' | 'tool';
 /**
  * Minimal component definition - only static manifest data
  * All versioning, SHAs, and deployment state moved to Git tags

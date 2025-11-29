@@ -1,15 +1,20 @@
 /**
  * Core git wrapper functionality for Edgit
  * Provides git integration with proper error handling and validation
+ *
+ * Each instance is bound to a specific workspace directory (immutable).
+ * Use createGitWrapper() factory function to create instances.
  */
 export declare class GitWrapper {
-    private static instance;
-    private workspaceDir?;
-    static getInstance(workspaceDir?: string): GitWrapper;
     /**
-     * Set workspace directory for all git operations
+     * Workspace directory for git operations (immutable after construction)
      */
-    setWorkspaceDir(workspaceDir: string): void;
+    private readonly workspaceDir;
+    /**
+     * Create a new GitWrapper instance
+     * @param workspaceDir - The workspace directory for git operations (defaults to process.cwd())
+     */
+    constructor(workspaceDir?: string);
     /**
      * Get current workspace directory
      */
@@ -106,7 +111,13 @@ export declare class GitWrapper {
     getStagedFiles(): Promise<string[]>;
 }
 /**
- * Convenience function to get GitWrapper instance
+ * Factory function to create a new GitWrapper instance
+ * @param workspaceDir - The workspace directory for git operations (defaults to process.cwd())
+ */
+export declare function createGitWrapper(workspaceDir?: string): GitWrapper;
+/**
+ * Convenience function to create a GitWrapper for the current directory
+ * @deprecated Use createGitWrapper() for explicit workspace control
  */
 export declare const git: () => GitWrapper;
 //# sourceMappingURL=git.d.ts.map

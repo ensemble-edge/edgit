@@ -69,8 +69,9 @@ export class ChangelogManager {
   private async readExistingChangelog(): Promise<string> {
     try {
       return await fs.readFile(this.filePath, 'utf8')
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
+    } catch (error) {
+      // Check for ENOENT (file not found) error
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
         // Create new changelog with standard template
         return this.createChangelogTemplate()
       }

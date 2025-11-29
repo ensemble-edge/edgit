@@ -91,9 +91,18 @@ export class ComponentDetector {
             'types/**/*.json', // Type definition JSONs
             'validation/**/*', // Validation directory
         ],
+        // MCP tool definitions
+        tool: [
+            'tools/**/*', // Any file in tools/ directory
+            '**/*.tool.ts', // TypeScript tool files
+            '**/*.tool.js', // JavaScript tool files
+            '**/*.tool.yaml', // YAML tool definitions
+            '**/*.tool.yml', // YML tool definitions
+            '**/tool*', // Files starting with "tool"
+        ],
     };
     constructor(git) {
-        this.git = git || GitWrapper.getInstance();
+        this.git = git || new GitWrapper();
     }
     /**
      * Detect component type and name from file path

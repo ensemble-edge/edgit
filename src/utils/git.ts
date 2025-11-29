@@ -2,37 +2,34 @@ import { spawn } from 'child_process'
 import type { ChildProcess } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs/promises'
+import { EdgitError } from '../errors/index.js'
 
 /**
  * Core git wrapper functionality for Edgit
  * Provides git integration with proper error handling and validation
+ *
+ * Each instance is bound to a specific workspace directory (immutable).
+ * Use createGitWrapper() factory function to create instances.
  */
 export class GitWrapper {
-  private static instance: GitWrapper
-  private workspaceDir?: string
-
-  public static getInstance(workspaceDir?: string): GitWrapper {
-    if (!GitWrapper.instance) {
-      GitWrapper.instance = new GitWrapper()
-    }
-    if (workspaceDir) {
-      GitWrapper.instance.workspaceDir = workspaceDir
-    }
-    return GitWrapper.instance
-  }
+  /**
+   * Workspace directory for git operations (immutable after construction)
+   */
+  private readonly workspaceDir: string
 
   /**
-   * Set workspace directory for all git operations
+   * Create a new GitWrapper instance
+   * @param workspaceDir - The workspace directory for git operations (defaults to process.cwd())
    */
-  public setWorkspaceDir(workspaceDir: string): void {
-    this.workspaceDir = workspaceDir
+  constructor(workspaceDir?: string) {
+    this.workspaceDir = workspaceDir || process.cwd()
   }
 
   /**
    * Get current workspace directory
    */
   public getWorkspaceDir(): string {
-    return this.workspaceDir || process.cwd()
+    return this.workspaceDir
   }
 
   /**
@@ -61,8 +58,8 @@ export class GitWrapper {
     args: string[],
     cwd?: string
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    // Use workspace directory if no cwd specified
-    const workingDir = cwd || this.workspaceDir || process.cwd()
+    // Use provided cwd or the instance's workspace directory
+    const workingDir = cwd || this.workspaceDir
 
     return new Promise((resolve) => {
       const childProcess: ChildProcess = spawn('git', args, {
@@ -104,8 +101,8 @@ export class GitWrapper {
    */
   async isGitRepo(path?: string): Promise<boolean> {
     try {
-      // Use workspace directory if no path specified and workspace is set
-      const checkPath = path || this.workspaceDir || '.'
+      // Use provided path or the instance's workspace directory
+      const checkPath = path || this.workspaceDir
       const result = await this.exec(['rev-parse', '--git-dir'], checkPath)
       return result.exitCode === 0
     } catch {
@@ -118,7 +115,7 @@ export class GitWrapper {
    */
   async getRepoRoot(cwd?: string): Promise<string | null> {
     try {
-      // Use workspace directory if no cwd specified and workspace is set
+      // Use provided cwd or the instance's workspace directory
       const workingDir = cwd || this.workspaceDir
       const result = await this.exec(['rev-parse', '--show-toplevel'], workingDir)
       if (result.exitCode === 0) {
@@ -258,20 +255,22 @@ export class GitWrapper {
     return new Promise((resolve, reject) => {
       const childProcess: ChildProcess = spawn('git', args, {
         stdio: 'inherit', // Pass through all I/O
-        cwd: process.cwd(),
+        cwd: this.workspaceDir,
       })
 
       childProcess.on('close', (exitCode: number | null) => {
         if (exitCode === 0) {
           resolve()
         } else {
-          process.exit(exitCode || 1)
+          // Reject with EdgitError that includes exit code for CLI to handle
+          const error = new EdgitError('GIT_ERROR', `Git command failed with exit code ${exitCode || 1}`)
+          ;(error as EdgitError & { exitCode: number }).exitCode = exitCode || 1
+          reject(error)
         }
       })
 
       childProcess.on('error', (error: Error) => {
-        console.error('Failed to execute git command:', error.message)
-        process.exit(1)
+        reject(new EdgitError('GIT_ERROR', `Failed to execute git command: ${error.message}`, error))
       })
     })
   }
@@ -373,6 +372,15 @@ export class GitWrapper {
 }
 
 /**
- * Convenience function to get GitWrapper instance
+ * Factory function to create a new GitWrapper instance
+ * @param workspaceDir - The workspace directory for git operations (defaults to process.cwd())
  */
-export const git = () => GitWrapper.getInstance()
+export function createGitWrapper(workspaceDir?: string): GitWrapper {
+  return new GitWrapper(workspaceDir)
+}
+
+/**
+ * Convenience function to create a GitWrapper for the current directory
+ * @deprecated Use createGitWrapper() for explicit workspace control
+ */
+export const git = () => new GitWrapper()

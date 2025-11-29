@@ -5,6 +5,9 @@ import * as path from 'path'
 /**
  * Base command handler for Edgit
  * Provides common functionality and defines the interface for all commands
+ *
+ * Commands receive a GitWrapper instance via constructor injection.
+ * If not provided, a new instance bound to process.cwd() is created.
  */
 export abstract class Command {
   protected git: GitWrapper
@@ -31,19 +34,22 @@ export abstract class Command {
   // Commands that should show component-aware information
   public static readonly ENHANCED_COMMANDS = ['status', 'log', 'diff']
 
+  /**
+   * Create a command with optional dependency injection
+   * @param git - GitWrapper instance (defaults to new instance for process.cwd())
+   * @param detector - Optional component detector
+   */
   constructor(git?: GitWrapper, detector?: ComponentDetector) {
-    this.git = git || GitWrapper.getInstance()
+    this.git = git || new GitWrapper()
     this.detector = detector
   }
 
   /**
-   * Set command context (including workspace directory)
+   * Set command context
+   * Note: The git workspace is immutable - use constructor injection for workspace control
    */
   public setContext(context: CommandContext): void {
     this.context = context
-    if (context.workspaceDir && this.git) {
-      this.git.setWorkspaceDir(context.workspaceDir)
-    }
   }
 
   /**
@@ -261,9 +267,11 @@ export interface CommandContext {
 
 /**
  * Create command execution context
+ * @param workspaceDir - Optional workspace directory (defaults to process.cwd())
  */
 export async function createCommandContext(workspaceDir?: string): Promise<CommandContext> {
-  const git = GitWrapper.getInstance(workspaceDir)
+  const effectiveWorkspace = workspaceDir || process.cwd()
+  const git = new GitWrapper(effectiveWorkspace)
   const cwd = process.cwd()
 
   // Get repo root in the context of the workspace directory
@@ -271,7 +279,7 @@ export async function createCommandContext(workspaceDir?: string): Promise<Comma
 
   const context: CommandContext = {
     cwd,
-    workspaceDir: workspaceDir,
+    workspaceDir: effectiveWorkspace,
     env: process.env,
     isCI: Boolean(process.env.CI),
     debug: Boolean(process.env.EDGIT_DEBUG),

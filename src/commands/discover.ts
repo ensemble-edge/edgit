@@ -1,6 +1,7 @@
 import { Command } from './base.js'
 import { ScanCommand } from './scan.js'
 import { DetectCommand } from './detect.js'
+import { EdgitError } from '../errors/index.js'
 
 export interface DiscoverOptions {
   // Common discover options can go here
@@ -39,9 +40,10 @@ export class DiscoverCommand extends Command {
         break
 
       default:
-        this.showError(`Unknown discover subcommand: ${subcommand}`)
-        console.log('\nRun "edgit discover --help" to see available subcommands.')
-        process.exit(1)
+        throw new EdgitError(
+          'VALIDATION_ERROR',
+          `Unknown discover subcommand: ${subcommand}. Run "edgit discover --help" to see available subcommands.`
+        )
     }
   }
 

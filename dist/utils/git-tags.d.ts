@@ -1,18 +1,42 @@
 import type { GitWrapper } from './git.js';
+import type { Result } from '../types/result.js';
 /**
  * Entity types that can be versioned
+ * Aligned with Conductor's ComponentType for seamless integration
+ *
+ * Each type gets its own namespace (pluralized):
+ * - agent → agents/
+ * - prompt → prompts/
+ * - schema → schemas/
+ * - template → templates/
+ * - query → queries/
+ * - config → configs/
+ * - script → scripts/
+ * - ensemble → ensembles/
+ * - tool → tools/
+ *
+ * Legacy 'component' type is still supported for backwards compatibility
+ * and maps to 'components/' namespace.
  */
-export type EntityType = 'component' | 'agent';
+export type EntityType = 'agent' | 'prompt' | 'schema' | 'template' | 'query' | 'config' | 'script' | 'ensemble' | 'tool' | 'agent-definition' | 'component';
 /**
  * Git Tag Manager for Edgit component and agent versioning and deployment
  * Handles namespaced tags with separation between version and deployment tags
- * Supports both components/ and agents/ namespaces
+ * Uses type-specific namespaces (prompts/, schemas/, templates/, etc.)
  */
 export declare class GitTagManager {
     private git;
     constructor(git: GitWrapper);
     /**
      * Get namespace prefix for entity type
+     * Pluralizes the type name to create the namespace
+     *
+     * Examples:
+     * - 'agent' → 'agents'
+     * - 'prompt' → 'prompts'
+     * - 'schema' → 'schemas'
+     * - 'query' → 'queries' (special case)
+     * - 'component' → 'components' (legacy)
      */
     private getNamespace;
     /**
@@ -26,7 +50,7 @@ export declare class GitTagManager {
     tag(name: string, tagName: string, entityType?: EntityType, sha?: string, message?: string): Promise<string>;
     /**
      * Create a namespaced component tag (backward compatible)
-     * @deprecated Use tag() with entityType parameter instead
+     * @deprecated Use tag() with specific entityType (prompt, schema, template, etc.) instead
      */
     tagComponent(component: string, tagName: string, sha?: string, message?: string): Promise<string>;
     /**
@@ -155,7 +179,95 @@ export declare class GitTagManager {
     getFileAtTag(name: string, tagName: string, filePath: string, entityType?: EntityType): Promise<string>;
 }
 /**
+ * Git tag error types for Result-based API
+ */
+export type GitTagError = {
+    kind: 'tag_exists';
+    tag: string;
+    message: string;
+} | {
+    kind: 'tag_not_found';
+    tag: string;
+    message: string;
+} | {
+    kind: 'git_error';
+    message: string;
+    stderr?: string;
+} | {
+    kind: 'invalid_ref';
+    ref: string;
+    message: string;
+} | {
+    kind: 'file_not_found';
+    path: string;
+    tag: string;
+    message: string;
+};
+/**
+ * Tag information returned by Result-based methods
+ */
+export interface TagInfo {
+    tag: string;
+    sha: string;
+    date: string;
+    message: string;
+    author: string;
+}
+/**
+ * Result-based GitTagManager methods
+ * These provide explicit error handling without throwing exceptions
+ */
+export declare class GitTagManagerResult {
+    private manager;
+    constructor(git: GitWrapper);
+    /**
+     * Create a tag with Result-based error handling
+     */
+    createTag(name: string, tagName: string, entityType?: EntityType, sha?: string, message?: string): Promise<Result<string, GitTagError>>;
+    /**
+     * Create an immutable version tag with Result-based error handling
+     */
+    createVersionTag(name: string, version: string, entityType?: EntityType, sha?: string, message?: string): Promise<Result<string, GitTagError>>;
+    /**
+     * Get tag SHA with Result-based error handling
+     */
+    getTagSHA(name: string, tagName: string, entityType?: EntityType): Promise<Result<string, GitTagError>>;
+    /**
+     * Get tag info with Result-based error handling
+     */
+    getTagInfo(name: string, tagName: string, entityType?: EntityType): Promise<Result<TagInfo, GitTagError>>;
+    /**
+     * Resolve a reference with Result-based error handling
+     */
+    resolveRef(name: string, ref: string, entityType?: EntityType): Promise<Result<string, GitTagError>>;
+    /**
+     * Get file content at tag with Result-based error handling
+     */
+    getFileAtTag(name: string, tagName: string, filePath: string, entityType?: EntityType): Promise<Result<string, GitTagError>>;
+    /**
+     * Move deployment tag with Result-based error handling
+     */
+    moveDeploymentTag(name: string, env: string, targetRef: string, entityType?: EntityType, message?: string): Promise<Result<string, GitTagError>>;
+    /**
+     * Delete a tag with Result-based error handling
+     */
+    deleteTag(name: string, tagName: string, entityType?: EntityType, deleteRemote?: boolean): Promise<Result<void, GitTagError>>;
+    /**
+     * Access the underlying manager for non-Result methods
+     */
+    get underlying(): GitTagManager;
+    listTags: (name: string, entityType?: EntityType) => Promise<string[]>;
+    tagExists: (name: string, tagName: string, entityType?: EntityType) => Promise<boolean>;
+    getVersionTags: (name: string, entityType?: EntityType) => Promise<string[]>;
+    getDeploymentTags: (name: string, entityType?: EntityType) => Promise<string[]>;
+    pushTags: (name: string, entityType?: EntityType, tagNames?: string[], force?: boolean) => Promise<void>;
+}
+/**
  * Convenience function to create GitTagManager instance
  */
 export declare function createGitTagManager(git: GitWrapper): GitTagManager;
+/**
+ * Create a Result-based GitTagManager for explicit error handling
+ */
+export declare function createGitTagManagerWithResult(git: GitWrapper): GitTagManagerResult;
 //# sourceMappingURL=git-tags.d.ts.map

@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises'
 import * as path from 'path'
-import { Command } from './base.js'
+import { Command, type CommandContext } from './base.js'
 import { GitWrapper } from '../utils/git.js'
 import { ComponentDetector } from '../utils/component-detector.js'
 import { AICommitManager } from '../utils/ai-commit.js'
@@ -389,7 +389,10 @@ NOTE:
 /**
  * Convenience function to create and execute CommitCommand
  */
-export async function commitWithVersioning(args: string[] = [], context?: any): Promise<void> {
+export async function commitWithVersioning(
+  args: string[] = [],
+  context?: CommandContext
+): Promise<void> {
   const command = new CommitCommand()
   if (context) {
     command.setContext(context)

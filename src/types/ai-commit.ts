@@ -13,6 +13,7 @@ export type ComponentType =
   | 'schema'
   | 'agent-definition'
   | 'ensemble'
+  | 'tool' // MCP tools - aligned with Conductor's ComponentType
 
 export interface AIConfig {
   mode: AIMode

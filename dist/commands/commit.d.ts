@@ -1,4 +1,4 @@
-import { Command } from './base.js';
+import { Command, type CommandContext } from './base.js';
 /**
  * CommitCommand for Git tag-based system
  * Keeps AI commit features but removes version bumping logic
@@ -41,5 +41,5 @@ export declare class CommitCommand extends Command {
 /**
  * Convenience function to create and execute CommitCommand
  */
-export declare function commitWithVersioning(args?: string[], context?: any): Promise<void>;
+export declare function commitWithVersioning(args?: string[], context?: CommandContext): Promise<void>;
 //# sourceMappingURL=commit.d.ts.map
