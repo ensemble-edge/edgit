@@ -263,14 +263,19 @@ export class GitWrapper {
           resolve()
         } else {
           // Reject with EdgitError that includes exit code for CLI to handle
-          const error = new EdgitError('GIT_ERROR', `Git command failed with exit code ${exitCode || 1}`)
+          const error = new EdgitError(
+            'GIT_ERROR',
+            `Git command failed with exit code ${exitCode || 1}`
+          )
           ;(error as EdgitError & { exitCode: number }).exitCode = exitCode || 1
           reject(error)
         }
       })
 
       childProcess.on('error', (error: Error) => {
-        reject(new EdgitError('GIT_ERROR', `Failed to execute git command: ${error.message}`, error))
+        reject(
+          new EdgitError('GIT_ERROR', `Failed to execute git command: ${error.message}`, error)
+        )
       })
     })
   }

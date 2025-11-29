@@ -43,20 +43,13 @@ export {
 // Component Registry
 // ============================================================================
 
-export {
-  RegistryLoader,
-  createRegistryLoader,
-  type RegistryError,
-} from '../utils/registry.js'
+export { RegistryLoader, createRegistryLoader, type RegistryError } from '../utils/registry.js'
 
 // ============================================================================
 // Component Detection
 // ============================================================================
 
-export {
-  ComponentDetector,
-  type DetectionPattern,
-} from '../utils/component-detector.js'
+export { ComponentDetector, type DetectionPattern } from '../utils/component-detector.js'
 
 // ============================================================================
 // Component Models & Utilities

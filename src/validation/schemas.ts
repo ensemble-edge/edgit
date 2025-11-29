@@ -15,11 +15,9 @@ import { z } from 'zod'
  * Semantic version string (with or without 'v' prefix)
  * Examples: v1.0.0, 1.2.3, v2.0.0-beta.1
  */
-export const versionSchema = z
-  .string()
-  .regex(/^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$/, {
-    message: 'Invalid version format. Use semver (e.g., v1.0.0, 1.2.3, v2.0.0-beta.1)',
-  })
+export const versionSchema = z.string().regex(/^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$/, {
+  message: 'Invalid version format. Use semver (e.g., v1.0.0, 1.2.3, v2.0.0-beta.1)',
+})
 
 /**
  * Component name - lowercase alphanumeric with hyphens/underscores
@@ -57,11 +55,9 @@ export const deploymentEnvSchema = z.enum(['prod', 'staging', 'canary', 'latest'
 /**
  * Git SHA (short or full)
  */
-export const gitShaSchema = z
-  .string()
-  .regex(/^[0-9a-f]{6,40}$/i, {
-    message: 'Invalid SHA. Must be 6-40 hexadecimal characters',
-  })
+export const gitShaSchema = z.string().regex(/^[0-9a-f]{6,40}$/i, {
+  message: 'Invalid SHA. Must be 6-40 hexadecimal characters',
+})
 
 /**
  * Git reference (SHA, tag name, branch, HEAD)
