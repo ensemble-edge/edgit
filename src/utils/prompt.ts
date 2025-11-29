@@ -148,7 +148,7 @@ export async function select<T>(
   const defaultSuffix = options.defaultIndex ? ` (default: ${options.defaultIndex})` : ''
   const prompt = `\nEnter number${defaultSuffix}: `
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve, _reject) => {
     const askQuestion = () => {
       rl.question(prompt, (answer) => {
         const trimmed = answer.trim()
@@ -177,7 +177,7 @@ export async function select<T>(
           rl.close()
           resolve(selected)
         } else {
-          console.log(`Invalid selection`)
+          console.log('Invalid selection')
           askQuestion()
         }
       })
