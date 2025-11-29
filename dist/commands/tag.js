@@ -1,8 +1,21 @@
 import { Command } from './base.js';
 import { createGitTagManager } from '../utils/git-tags.js';
 import { ComponentUtils } from '../models/components.js';
+import { EdgitError } from '../errors/index.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+/**
+ * Convert ComponentType to EntityType for git tagging
+ * Maps Edgit's component types to the git-tags EntityType
+ */
+function componentTypeToEntityType(componentType) {
+    // agent-definition maps to agent
+    if (componentType === 'agent-definition') {
+        return 'agent';
+    }
+    // All other types map directly
+    return componentType;
+}
 /**
  * Tag command for creating and managing component version and deployment tags
  * Replaces stored versioning with Git's native tag system
@@ -12,6 +25,18 @@ export class TagCommand extends Command {
     constructor() {
         super();
         this.tagManager = createGitTagManager(this.git);
+    }
+    /**
+     * Extract --format option from args
+     */
+    extractFormat(args) {
+        const formatIndex = args.indexOf('--format');
+        if (formatIndex !== -1 && args[formatIndex + 1]) {
+            const format = args[formatIndex + 1];
+            const cleanArgs = [...args.slice(0, formatIndex), ...args.slice(formatIndex + 2)];
+            return { format: format === 'json' ? 'json' : 'table', cleanArgs };
+        }
+        return { format: 'table', cleanArgs: args };
     }
     async execute(args) {
         if (args.length === 0) {
@@ -47,47 +72,44 @@ export class TagCommand extends Command {
      */
     async createTag(args) {
         if (args.length < 2) {
-            console.error('Usage: edgit tag create <component> <tagname> [sha]');
-            console.error('       edgit tag <component> <tagname> [sha]');
-            process.exit(1);
+            throw new EdgitError('VALIDATION_ERROR', 'Usage: edgit tag create <component> <tagname> [sha]');
         }
         const componentName = args[0];
         const tagName = args[1];
         const sha = args[2];
         if (!componentName || !tagName) {
-            console.error('Component name and tag name are required');
-            process.exit(1);
+            throw new EdgitError('VALIDATION_ERROR', 'Component name and tag name are required');
         }
         // Load registry to verify component exists
         const registry = await this.loadRegistry();
         const component = ComponentUtils.findComponentByName(registry, componentName);
         if (!component) {
-            console.error(`❌ Component '${componentName}' not found`);
-            console.log(`Available components: ${ComponentUtils.listComponentNames(registry).join(', ')}`);
-            process.exit(1);
+            const available = ComponentUtils.listComponentNames(registry).join(', ');
+            throw new EdgitError('COMPONENT_NOT_FOUND', `Component '${componentName}' not found. Available: ${available}`);
         }
+        // Get the entity type from the component's actual type
+        const entityType = componentTypeToEntityType(component.type);
         try {
             // Check if it's a version tag or deployment tag
             if (this.isVersionTag(tagName)) {
-                await this.createVersionTag(componentName, tagName, sha);
+                await this.createVersionTag(componentName, tagName, entityType, sha);
             }
             else if (this.isDeploymentTag(tagName)) {
-                await this.createDeploymentTag(componentName, tagName, sha);
+                await this.createDeploymentTag(componentName, tagName, entityType, sha);
             }
             else {
-                await this.createCustomTag(componentName, tagName, sha);
+                await this.createCustomTag(componentName, tagName, entityType, sha);
             }
         }
         catch (error) {
-            console.error(`❌ Failed to create tag: ${error instanceof Error ? error.message : error}`);
-            process.exit(1);
+            throw EdgitError.from(error, 'TAG_EXISTS');
         }
     }
     /**
      * Create an immutable version tag (v1.0.0)
      */
-    async createVersionTag(componentName, version, sha) {
-        const gitTag = await this.tagManager.createVersionTag(componentName, version, 'component', sha, `Release ${componentName} ${version}`);
+    async createVersionTag(componentName, version, entityType, sha) {
+        const gitTag = await this.tagManager.createVersionTag(componentName, version, entityType, sha, `Release ${componentName} ${version}`);
         console.log(`✅ Created version tag: ${componentName}@${version}`);
         console.log(`   Git tag: ${gitTag}`);
         if (sha) {
@@ -98,9 +120,9 @@ export class TagCommand extends Command {
     /**
      * Create or move a deployment tag (prod, staging, etc.)
      */
-    async createDeploymentTag(componentName, env, targetRef) {
+    async createDeploymentTag(componentName, env, entityType, targetRef) {
         const target = targetRef || 'HEAD';
-        const gitTag = await this.tagManager.moveDeploymentTag(componentName, env, target, 'component', `Deploy ${componentName} to ${env}`);
+        const gitTag = await this.tagManager.moveDeploymentTag(componentName, env, target, entityType, `Deploy ${componentName} to ${env}`);
         console.log(`✅ ${targetRef ? 'Moved' : 'Created'} deployment tag: ${componentName}@${env}`);
         console.log(`   Git tag: ${gitTag}`);
         console.log(`   Points to: ${target}`);
@@ -109,8 +131,8 @@ export class TagCommand extends Command {
     /**
      * Create a custom tag
      */
-    async createCustomTag(componentName, tagName, sha) {
-        const gitTag = await this.tagManager.tagComponent(componentName, tagName, sha, `Tag ${componentName} as ${tagName}`);
+    async createCustomTag(componentName, tagName, entityType, sha) {
+        const gitTag = await this.tagManager.tag(componentName, tagName, entityType, sha, `Tag ${componentName} as ${tagName}`);
         console.log(`✅ Created custom tag: ${componentName}@${tagName}`);
         console.log(`   Git tag: ${gitTag}`);
         if (sha) {
@@ -120,58 +142,73 @@ export class TagCommand extends Command {
     }
     /**
      * List tags for a component or all components
-     * Usage: edgit tag list [component]
+     * Usage: edgit tag list [component] [--format json]
      */
     async listTags(args) {
+        const { format, cleanArgs } = this.extractFormat(args);
         const registry = await this.loadRegistry();
-        if (args.length === 0) {
+        if (cleanArgs.length === 0) {
             // List all components and their tags
-            await this.listAllComponentTags(registry);
+            await this.listAllComponentTags(registry, format);
         }
         else {
             // List tags for specific component
-            const componentName = args[0];
+            const componentName = cleanArgs[0];
             if (!componentName) {
-                console.error('Component name is required');
-                process.exit(1);
+                throw new EdgitError('VALIDATION_ERROR', 'Component name is required');
             }
-            await this.listComponentTags(componentName, registry);
+            await this.listComponentTags(componentName, registry, true, format);
         }
     }
     /**
      * Show detailed information about a specific tag
-     * Usage: edgit tag show <component>@<tag>
+     * Usage: edgit tag show <component>@<tag> [--format json]
      */
     async showTag(args) {
-        if (args.length === 0) {
-            console.error('Usage: edgit tag show <component>@<tag>');
-            process.exit(1);
+        const { format, cleanArgs } = this.extractFormat(args);
+        if (cleanArgs.length === 0) {
+            throw new EdgitError('VALIDATION_ERROR', 'Usage: edgit tag show <component>@<tag>');
         }
-        const spec = args[0];
+        const spec = cleanArgs[0];
         if (!spec) {
-            console.error('Usage: edgit tag show <component>@<tag>');
-            process.exit(1);
+            throw new EdgitError('VALIDATION_ERROR', 'Usage: edgit tag show <component>@<tag>');
         }
         const parts = spec.split('@');
         if (parts.length !== 2) {
-            console.error('Usage: edgit tag show <component>@<tag>');
-            process.exit(1);
+            throw new EdgitError('VALIDATION_ERROR', 'Usage: edgit tag show <component>@<tag>');
         }
         const componentName = parts[0];
         const tagName = parts[1];
         if (!componentName || !tagName) {
-            console.error('Usage: edgit tag show <component>@<tag>');
-            process.exit(1);
+            throw new EdgitError('VALIDATION_ERROR', 'Usage: edgit tag show <component>@<tag>');
         }
         // Verify component exists
         const registry = await this.loadRegistry();
         const component = ComponentUtils.findComponentByName(registry, componentName);
         if (!component) {
-            console.error(`❌ Component '${componentName}' not found`);
-            process.exit(1);
+            throw new EdgitError('COMPONENT_NOT_FOUND', `Component '${componentName}' not found`);
         }
+        // Get the entity type from the component's actual type for type-specific namespaces
+        const entityType = componentTypeToEntityType(component.type);
         try {
-            const tagInfo = await this.tagManager.getTagInfo(componentName, tagName);
+            const tagInfo = await this.tagManager.getTagInfo(componentName, tagName, entityType);
+            if (format === 'json') {
+                const output = {
+                    component: componentName,
+                    tag: tagName,
+                    sha: tagInfo.sha,
+                    date: tagInfo.date,
+                    author: tagInfo.author,
+                    message: tagInfo.message,
+                    path: component.path,
+                    type: component.type,
+                    isVersion: this.isVersionTag(tagName),
+                    isDeployment: this.isDeploymentTag(tagName),
+                };
+                console.log(JSON.stringify(output, null, 2));
+                return;
+            }
+            // Table output (default)
             console.log(`📦 ${componentName}@${tagName}`);
             console.log(`   SHA: ${tagInfo.sha}`);
             console.log(`   Date: ${tagInfo.date}`);
@@ -182,8 +219,7 @@ export class TagCommand extends Command {
             console.log(`   Type: ${component.type}`);
         }
         catch (error) {
-            console.error(`❌ Tag not found: ${componentName}@${tagName}`);
-            process.exit(1);
+            throw new EdgitError('TAG_NOT_FOUND', `Tag not found: ${componentName}@${tagName}`);
         }
     }
     /**
@@ -192,43 +228,38 @@ export class TagCommand extends Command {
      */
     async deleteTag(args) {
         if (args.length === 0) {
-            console.error('Usage: edgit tag delete <component>@<tag> [--remote]');
-            process.exit(1);
+            throw new EdgitError('VALIDATION_ERROR', 'Usage: edgit tag delete <component>@<tag> [--remote]');
         }
         const spec = args[0];
         if (!spec) {
-            console.error('Usage: edgit tag delete <component>@<tag> [--remote]');
-            process.exit(1);
+            throw new EdgitError('VALIDATION_ERROR', 'Usage: edgit tag delete <component>@<tag> [--remote]');
         }
         const deleteRemote = args.includes('--remote');
         const parts = spec.split('@');
         if (parts.length !== 2) {
-            console.error('Usage: edgit tag delete <component>@<tag> [--remote]');
-            process.exit(1);
+            throw new EdgitError('VALIDATION_ERROR', 'Usage: edgit tag delete <component>@<tag> [--remote]');
         }
         const componentName = parts[0];
         const tagName = parts[1];
         if (!componentName || !tagName) {
-            console.error('Usage: edgit tag delete <component>@<tag> [--remote]');
-            process.exit(1);
+            throw new EdgitError('VALIDATION_ERROR', 'Usage: edgit tag delete <component>@<tag> [--remote]');
         }
         // Verify component exists
         const registry = await this.loadRegistry();
         const component = ComponentUtils.findComponentByName(registry, componentName);
         if (!component) {
-            console.error(`❌ Component '${componentName}' not found`);
-            process.exit(1);
+            throw new EdgitError('COMPONENT_NOT_FOUND', `Component '${componentName}' not found`);
         }
+        const entityType = componentTypeToEntityType(component.type);
         try {
-            await this.tagManager.deleteTag(componentName, tagName, 'component', deleteRemote);
+            await this.tagManager.deleteTag(componentName, tagName, entityType, deleteRemote);
             console.log(`✅ Deleted tag: ${componentName}@${tagName}`);
             if (deleteRemote) {
                 console.log('   Also deleted from remote');
             }
         }
         catch (error) {
-            console.error(`❌ Failed to delete tag: ${error instanceof Error ? error.message : error}`);
-            process.exit(1);
+            throw EdgitError.from(error, 'TAG_NOT_FOUND');
         }
     }
     /**
@@ -238,30 +269,29 @@ export class TagCommand extends Command {
     async pushTags(args) {
         const force = args.includes('--force');
         const componentName = args.find((arg) => arg !== '--force');
+        const registry = await this.loadRegistry();
         if (componentName) {
             // Push tags for specific component
-            const registry = await this.loadRegistry();
             const component = ComponentUtils.findComponentByName(registry, componentName);
             if (!component) {
-                console.error(`❌ Component '${componentName}' not found`);
-                process.exit(1);
+                throw new EdgitError('COMPONENT_NOT_FOUND', `Component '${componentName}' not found`);
             }
+            const entityType = componentTypeToEntityType(component.type);
             try {
-                await this.tagManager.pushTags(componentName, 'component', undefined, force);
+                await this.tagManager.pushTags(componentName, entityType, undefined, force);
                 console.log(`✅ Pushed tags for ${componentName}`);
             }
             catch (error) {
-                console.error(`❌ Failed to push tags: ${error instanceof Error ? error.message : error}`);
-                process.exit(1);
+                throw EdgitError.from(error, 'GIT_ERROR');
             }
         }
         else {
             // Push all component tags
-            const registry = await this.loadRegistry();
-            const componentNames = ComponentUtils.listComponentNames(registry);
-            for (const name of componentNames) {
+            const allComponents = ComponentUtils.getAllComponents(registry);
+            for (const { name, component } of allComponents) {
+                const entityType = componentTypeToEntityType(component.type);
                 try {
-                    await this.tagManager.pushTags(name, 'component', undefined, force);
+                    await this.tagManager.pushTags(name, entityType, undefined, force);
                     console.log(`✅ Pushed tags for ${name}`);
                 }
                 catch (error) {
@@ -287,34 +317,96 @@ export class TagCommand extends Command {
     /**
      * List tags for all components
      */
-    async listAllComponentTags(registry) {
+    async listAllComponentTags(registry, format = 'table') {
         const componentNames = ComponentUtils.listComponentNames(registry);
+        if (format === 'json') {
+            const components = [];
+            for (const componentName of componentNames) {
+                const data = await this.getComponentTagData(componentName, registry);
+                if (data) {
+                    components.push(data);
+                }
+            }
+            console.log(JSON.stringify({ components, total: components.length }, null, 2));
+            return;
+        }
+        // Table output (default)
         if (componentNames.length === 0) {
             console.log('No components registered');
             return;
         }
         console.log('📦 Component Tags:\n');
         for (const componentName of componentNames) {
-            await this.listComponentTags(componentName, registry, false);
+            await this.listComponentTags(componentName, registry, false, format);
             console.log(); // Empty line between components
+        }
+    }
+    /**
+     * Get tag data for a component (used for JSON output)
+     */
+    async getComponentTagData(componentName, registry) {
+        const component = ComponentUtils.findComponentByName(registry, componentName);
+        if (!component)
+            return null;
+        const entityType = componentTypeToEntityType(component.type);
+        try {
+            const allTags = await this.tagManager.listTags(componentName, entityType);
+            const versionTags = await this.tagManager.getVersionTags(componentName, entityType);
+            const deploymentTags = await this.tagManager.getDeploymentTags(componentName, entityType);
+            const customTags = allTags.filter((tag) => !this.isVersionTag(tag) && !this.isDeploymentTag(tag));
+            return {
+                name: componentName,
+                type: component.type,
+                path: component.path,
+                versions: versionTags,
+                deployments: deploymentTags,
+                custom: customTags,
+            };
+        }
+        catch {
+            return {
+                name: componentName,
+                type: component.type,
+                path: component.path,
+                versions: [],
+                deployments: [],
+                custom: [],
+            };
         }
     }
     /**
      * List tags for a specific component
      */
-    async listComponentTags(componentName, registry, standalone = true) {
+    async listComponentTags(componentName, registry, standalone = true, format = 'table') {
         const component = ComponentUtils.findComponentByName(registry, componentName);
         if (!component) {
-            console.error(`❌ Component '${componentName}' not found`);
             if (standalone) {
-                process.exit(1);
+                throw new EdgitError('COMPONENT_NOT_FOUND', `Component '${componentName}' not found`);
             }
+            console.log(`   ⚠️ Component '${componentName}' not found`);
             return;
         }
+        // Get the entity type from the component's actual type for type-specific namespaces
+        const entityType = componentTypeToEntityType(component.type);
         try {
-            const allTags = await this.tagManager.listComponentTags(componentName);
-            const versionTags = await this.tagManager.getVersionTags(componentName);
-            const deploymentTags = await this.tagManager.getDeploymentTags(componentName);
+            const allTags = await this.tagManager.listTags(componentName, entityType);
+            const versionTags = await this.tagManager.getVersionTags(componentName, entityType);
+            const deploymentTags = await this.tagManager.getDeploymentTags(componentName, entityType);
+            const customTags = allTags.filter((tag) => !this.isVersionTag(tag) && !this.isDeploymentTag(tag));
+            if (format === 'json') {
+                const output = {
+                    name: componentName,
+                    type: component.type,
+                    path: component.path,
+                    versions: versionTags,
+                    deployments: deploymentTags,
+                    custom: customTags,
+                    totalTags: allTags.length,
+                };
+                console.log(JSON.stringify(output, null, 2));
+                return;
+            }
+            // Table output (default)
             console.log(`📦 ${componentName} (${component.type})`);
             console.log(`   Path: ${component.path}`);
             if (versionTags.length > 0) {
@@ -323,7 +415,6 @@ export class TagCommand extends Command {
             if (deploymentTags.length > 0) {
                 console.log(`   Deployments: ${deploymentTags.join(', ')}`);
             }
-            const customTags = allTags.filter((tag) => !this.isVersionTag(tag) && !this.isDeploymentTag(tag));
             if (customTags.length > 0) {
                 console.log(`   Custom: ${customTags.join(', ')}`);
             }
@@ -332,10 +423,10 @@ export class TagCommand extends Command {
             }
         }
         catch (error) {
-            console.error(`❌ Failed to list tags for ${componentName}: ${error instanceof Error ? error.message : error}`);
             if (standalone) {
-                process.exit(1);
+                throw EdgitError.from(error, 'GIT_ERROR');
             }
+            console.log(`   ⚠️ Failed to list tags: ${error instanceof Error ? error.message : error}`);
         }
     }
     /**
@@ -362,10 +453,13 @@ edgit tag - Manage component version and deployment tags
 USAGE:
   edgit tag create <component> <tagname> [sha]  Create a new tag
   edgit tag <component> <tagname> [sha]         Create a new tag (shorthand)
-  edgit tag list [component]                    List tags for component(s)
-  edgit tag show <component>@<tag>              Show detailed tag information
+  edgit tag list [component] [--format json]    List tags for component(s)
+  edgit tag show <component>@<tag> [--format json]  Show detailed tag information
   edgit tag delete <component>@<tag> [--remote] Delete a tag
   edgit tag push [component] [--force]          Push tags to remote
+
+OPTIONS:
+  --format <format>    Output format: table (default), json
 
 TAG TYPES:
   Version tags:    v1.0.0, v2.1.3 (immutable, cannot be moved)
@@ -377,13 +471,25 @@ EXAMPLES:
   edgit tag create extraction-prompt prod       # Create/move deployment tag
   edgit tag list                                # List all component tags
   edgit tag list extraction-prompt              # List tags for one component
+  edgit tag list --format json                  # List tags in JSON format
   edgit tag show extraction-prompt@v1.0.0       # Show tag details
+  edgit tag show extraction-prompt@v1.0.0 --format json  # Show tag details as JSON
   edgit tag delete extraction-prompt@v1.0.0     # Delete local tag
   edgit tag push extraction-prompt --force      # Push tags (force for deployments)
 
 GIT TAG FORMAT:
-  All tags are stored as: components/<component>/<tag>
-  Example: components/extraction-prompt/v1.0.0
+  Tags use type-specific namespaces: <type>s/<component>/<tag>
+
+  Examples by component type:
+    prompts/extraction-prompt/v1.0.0     (prompt component)
+    schemas/user-schema/v1.0.0           (schema component)
+    agents/analyzer/v1.0.0               (agent-definition component)
+    templates/email-template/prod        (template component)
+    ensembles/redirect-flow/staging      (ensemble component)
+    tools/fetch-tool/v1.0.0              (tool component)
+    queries/user-lookup/latest           (query component)
+    configs/app-config/v1.0.0            (config component)
+    scripts/transform-script/v1.0.0      (script component)
 `;
     }
     /**

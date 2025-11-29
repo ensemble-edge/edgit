@@ -3,7 +3,7 @@
  */
 export type AIMode = 'auto' | 'enhance' | 'off';
 export type AIProviderName = 'openai';
-export type ComponentType = 'template' | 'prompt' | 'query' | 'config' | 'script' | 'schema' | 'agent-definition' | 'ensemble';
+export type ComponentType = 'template' | 'prompt' | 'query' | 'config' | 'script' | 'schema' | 'agent-definition' | 'ensemble' | 'tool';
 export interface AIConfig {
     mode: AIMode;
     provider: AIProviderName;

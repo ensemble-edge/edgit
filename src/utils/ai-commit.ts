@@ -148,8 +148,8 @@ class OpenAIProvider implements AIProvider {
       }
 
       return message
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
         throw new Error('OpenAI request timed out')
       }
       throw error
@@ -191,11 +191,12 @@ export class AICommitManager {
     try {
       const message = await this.provider.generateRepoMessage(context)
       return { success: true, message }
-    } catch (error: any) {
-      console.warn(`⚠️  AI repo message generation failed: ${error.message}`)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.warn(`⚠️  AI repo message generation failed: ${errorMessage}`)
       return {
         success: false,
-        error: error.message,
+        error: errorMessage,
         fallback: true,
       }
     }
@@ -213,9 +214,10 @@ export class AICommitManager {
     try {
       const message = await this.provider.generateComponentMessage(component)
       return { success: true, message }
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
       console.warn(
-        `⚠️  AI component message generation failed for ${component.name}: ${error.message}`
+        `⚠️  AI component message generation failed for ${component.name}: ${errorMessage}`
       )
       return {
         success: false,

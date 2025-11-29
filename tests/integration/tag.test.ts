@@ -26,7 +26,8 @@ describe('edgit tag', () => {
     expect(result.exitCode).toBe(0)
 
     const tags = await repo.listTags()
-    expect(tags).toContain('components/test-prompt/v1.0.0')
+    // Tags now use type-specific namespaces: prompts/ for prompt components
+    expect(tags).toContain('prompts/test-prompt/v1.0.0')
   })
 
   it('should fail if version tag already exists', async () => {
@@ -53,8 +54,9 @@ describe('edgit tag', () => {
     expect(result.exitCode).toBe(0)
 
     const tags = await repo.listTags()
-    expect(tags).toContain('components/test-prompt/v1.0.0')
-    expect(tags).toContain('components/test-prompt/v2.0.0')
+    // Tags now use type-specific namespaces: prompts/ for prompt components
+    expect(tags).toContain('prompts/test-prompt/v1.0.0')
+    expect(tags).toContain('prompts/test-prompt/v2.0.0')
   })
 
   it('should list tags for a component', async () => {

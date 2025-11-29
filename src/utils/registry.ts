@@ -4,6 +4,13 @@ import type { ComponentRegistry } from '../models/components.js'
 import type { Result } from '../types/result.js'
 
 /**
+ * Type guard for NodeJS filesystem errors with error codes
+ */
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && 'code' in error
+}
+
+/**
  * Registry-specific error types
  */
 export type RegistryError =
@@ -33,7 +40,7 @@ export class RegistryLoader {
       const registry = JSON.parse(content) as ComponentRegistry
       return { ok: true, value: registry }
     } catch (error) {
-      if ((error as any).code === 'ENOENT') {
+      if (isNodeError(error) && error.code === 'ENOENT') {
         return {
           ok: false,
           error: {
@@ -42,13 +49,18 @@ export class RegistryLoader {
           },
         }
       }
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      const parseError: RegistryError = {
+        kind: 'parse_error',
+        message: `Failed to load registry: ${errorMessage}`,
+      }
+      // Only add cause if it's an Error (satisfies exactOptionalPropertyTypes)
+      if (error instanceof Error) {
+        parseError.cause = error
+      }
       return {
         ok: false,
-        error: {
-          kind: 'parse_error',
-          message: `Failed to load registry: ${(error as Error).message}`,
-          cause: error as Error,
-        },
+        error: parseError,
       }
     }
   }

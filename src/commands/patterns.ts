@@ -1,6 +1,7 @@
 import { Command } from './base.js'
 import { ComponentDetector, type DetectionPattern } from '../utils/component-detector.js'
 import { ComponentUtils, type ComponentRegistry, type ComponentType } from '../models/components.js'
+import { InteractivePrompt, createPrompt } from '../utils/prompt.js'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 
@@ -10,12 +11,23 @@ export interface PatternsOptions {
   description?: string
   force?: boolean
   test?: string
+  format?: 'table' | 'json'
 }
+
+/** Valid component types for pattern detection */
+const COMPONENT_TYPES: ComponentType[] = ['prompt', 'template', 'query', 'config', 'script', 'schema', 'agent-definition', 'ensemble', 'tool']
 
 /**
  * Patterns command for managing component detection patterns
  */
 export class PatternsCommand extends Command {
+  private prompt: InteractivePrompt
+
+  constructor(...args: ConstructorParameters<typeof Command>) {
+    super(...args)
+    this.prompt = createPrompt()
+  }
+
   async execute(args: string[]): Promise<void> {
     await this.validateGitRepo()
 
@@ -63,12 +75,14 @@ Subcommands:
 Options:
   --type <type>           Component type for new patterns (prompt|agent|sql|config)
   --description <desc>    Description for new patterns
+  --format <format>       Output format: table (default), json
   --force                 Force operations without confirmation
   --test <file>           Test file for pattern validation
 
 Examples:
   edgit discover patterns list                           # Show all patterns
   edgit discover patterns list --type prompt            # Show prompt patterns only
+  edgit discover patterns list --format json            # JSON output for scripting
   edgit discover patterns add "*.prompt.md"             # Add pattern with interactive setup
   edgit discover patterns add "scripts/*.py" --type agent --description "Python agent scripts"
   edgit discover patterns remove custom-1               # Remove custom pattern
@@ -76,25 +90,64 @@ Examples:
     `.trim()
   }
 
-  private extractPatternsOptions(parsed: any): PatternsOptions {
-    return {
-      type: parsed.options.type as ComponentType,
-      pattern: parsed.options.pattern,
-      description: parsed.options.description,
-      force: parsed.flags.force,
-      test: parsed.options.test,
+  private extractPatternsOptions(parsed: {
+    flags: Record<string, boolean>
+    options: Record<string, string>
+    positional: string[]
+  }): PatternsOptions {
+    const opts: PatternsOptions = {}
+
+    // Only set properties if they have values (satisfies exactOptionalPropertyTypes)
+    if (parsed.options.type) {
+      opts.type = parsed.options.type as ComponentType
     }
+    if (parsed.options.pattern) {
+      opts.pattern = parsed.options.pattern
+    }
+    if (parsed.options.description) {
+      opts.description = parsed.options.description
+    }
+    if (parsed.flags.force !== undefined) {
+      opts.force = parsed.flags.force
+    }
+    if (parsed.options.test) {
+      opts.test = parsed.options.test
+    }
+    if (parsed.options.format) {
+      opts.format = parsed.options.format as 'table' | 'json'
+    }
+
+    return opts
   }
 
   private async listPatterns(options: PatternsOptions): Promise<void> {
     const detector = new ComponentDetector(this.git)
     const patterns = detector.getPatterns()
 
-    console.log('🔍 Component Detection Patterns\n')
-
     const filteredPatterns = options.type
-      ? patterns.filter((p: any) => p.type === options.type)
+      ? patterns.filter((p: DetectionPattern) => p.type === options.type)
       : patterns
+
+    // JSON output
+    if (options.format === 'json') {
+      const output = {
+        patterns: filteredPatterns.map((p) => ({
+          id: p.id || `${p.type}-auto`,
+          type: p.type,
+          pattern: p.pattern,
+          description: p.description,
+          confidence: p.confidence,
+          isCustom: p.isCustom || false,
+        })),
+        total: filteredPatterns.length,
+        filter: options.type || null,
+      }
+      console.log(JSON.stringify(output, null, 2))
+      return
+    }
+
+    // Table output (default)
+    console.log('🔍 Component Detection Patterns\n')
 
     if (filteredPatterns.length === 0) {
       if (options.type) {
@@ -326,20 +379,23 @@ Examples:
   }
 
   private async promptForType(): Promise<ComponentType> {
-    // This would need readline in real implementation
-    // For now, return a default
-    return 'prompt'
+    const type = await this.prompt.select(
+      'Select component type:',
+      COMPONENT_TYPES,
+      { defaultIndex: 1 }
+    )
+    return type
   }
 
   private async promptForDescription(pattern: string, type: ComponentType): Promise<string> {
-    // This would need readline in real implementation
-    // For now, generate a default
-    return `Custom ${type} pattern for ${pattern}`
+    const description = await this.prompt.input(
+      'Enter description:',
+      { default: `Custom ${type} pattern for ${pattern}` }
+    )
+    return description
   }
 
   private async confirmAction(message: string): Promise<boolean> {
-    // This would need readline in real implementation
-    // For now, return true (as if --force was used)
-    return true
+    return this.prompt.confirm(message)
   }
 }

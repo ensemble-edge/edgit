@@ -2,12 +2,33 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import { Command } from './base.js'
 import { GitWrapper } from '../utils/git.js'
-import type { GitTagManager } from '../utils/git-tags.js'
+import type { GitTagManager, EntityType } from '../utils/git-tags.js'
 import { createGitTagManager } from '../utils/git-tags.js'
-import type { ComponentRegistry } from '../models/components.js'
+import type { ComponentRegistry, ComponentType, Component } from '../models/components.js'
 import { ComponentUtils, ComponentSpec, ComponentSpecParser } from '../models/components.js'
 import { createRegistryLoader } from '../utils/registry.js'
 import { ComponentDetector } from '../utils/component-detector.js'
+
+/**
+ * Extended component with optional untracked marker for display purposes
+ */
+interface ComponentEntry {
+  name: string
+  component: Component & { untracked?: boolean }
+}
+
+/**
+ * Convert ComponentType to EntityType for git tagging
+ * Maps Edgit's component types to the git-tags EntityType
+ */
+function componentTypeToEntityType(componentType: ComponentType): EntityType {
+  // agent-definition maps to agent
+  if (componentType === 'agent-definition') {
+    return 'agent'
+  }
+  // All other types map directly
+  return componentType as EntityType
+}
 
 /**
  * ComponentsCommand for Git tag-based component management
@@ -97,7 +118,7 @@ export class ComponentsCommand extends Command {
     const tracked = flags.tracked as boolean | undefined
     const untracked = flags.untracked as boolean | undefined
 
-    let componentEntries: Array<{ name: string; component: any }>
+    let componentEntries: ComponentEntry[]
 
     // Handle tracked/untracked filtering
     if (untracked) {
@@ -138,7 +159,8 @@ export class ComponentsCommand extends Command {
     if (tagsOnly) {
       const entriesWithTags = []
       for (const entry of componentEntries) {
-        const tags = await this.tagManager.listComponentTags(entry.name)
+        const entityType = componentTypeToEntityType(entry.component.type)
+        const tags = await this.tagManager.listTags(entry.name, entityType)
         if (tags.length > 0) {
           entriesWithTags.push(entry)
         }
@@ -172,8 +194,8 @@ export class ComponentsCommand extends Command {
    */
   private async findUntrackedComponents(
     registry: ComponentRegistry
-  ): Promise<Array<{ name: string; component: any }>> {
-    const untrackedComponents: Array<{ name: string; component: any }> = []
+  ): Promise<ComponentEntry[]> {
+    const untrackedComponents: ComponentEntry[] = []
 
     // Use ComponentDetector to identify component files
     const detector = new ComponentDetector(this.git)
@@ -251,7 +273,7 @@ export class ComponentsCommand extends Command {
    * List components in table format (default)
    */
   private async listComponentsTable(
-    componentEntries: Array<{ name: string; component: any }>,
+    componentEntries: ComponentEntry[],
     flags: Record<string, boolean | string | number>,
     limit?: number
   ): Promise<void> {
@@ -271,7 +293,7 @@ export class ComponentsCommand extends Command {
           acc[component.type]!.push({ name, component })
           return acc
         },
-        {} as Record<string, Array<{ name: string; component: any }>>
+        {} as Record<string, ComponentEntry[]>
       )
 
       for (const [type, components] of Object.entries(byType)) {
@@ -287,15 +309,26 @@ export class ComponentsCommand extends Command {
   /**
    * List components in JSON format
    */
+  /**
+   * JSON output structure for components
+   */
   private async listComponentsJSON(
-    componentEntries: Array<{ name: string; component: any }>,
+    componentEntries: ComponentEntry[],
     limit?: number
   ): Promise<void> {
-    const output: any[] = []
+    const output: Array<{
+      name: string
+      type: ComponentType
+      path: string
+      versions: string[]
+      deploymentTags: string[]
+      versionCount: number
+    }> = []
 
     for (const { name, component } of componentEntries) {
-      const versionTags = await this.tagManager.getVersionTags(name)
-      const deploymentTags = await this.tagManager.getDeploymentTags(name)
+      const entityType = componentTypeToEntityType(component.type)
+      const versionTags = await this.tagManager.getVersionTags(name, entityType)
+      const deploymentTags = await this.tagManager.getDeploymentTags(name, entityType)
 
       // Apply limit
       const versions = limit ? versionTags.slice(-limit) : versionTags
@@ -317,14 +350,15 @@ export class ComponentsCommand extends Command {
    * List components in YAML format
    */
   private async listComponentsYAML(
-    componentEntries: Array<{ name: string; component: any }>,
+    componentEntries: ComponentEntry[],
     limit?: number
   ): Promise<void> {
     console.log('components:')
 
     for (const { name, component } of componentEntries) {
-      const versionTags = await this.tagManager.getVersionTags(name)
-      const deploymentTags = await this.tagManager.getDeploymentTags(name)
+      const entityType = componentTypeToEntityType(component.type)
+      const versionTags = await this.tagManager.getVersionTags(name, entityType)
+      const deploymentTags = await this.tagManager.getDeploymentTags(name, entityType)
 
       // Apply limit
       const versions = limit ? versionTags.slice(-limit) : versionTags
@@ -349,7 +383,7 @@ export class ComponentsCommand extends Command {
    * List components in tree format
    */
   private async listComponentsTree(
-    componentEntries: Array<{ name: string; component: any }>,
+    componentEntries: ComponentEntry[],
     limit?: number
   ): Promise<void> {
     console.log('\nRepository Components:\n')
@@ -361,7 +395,7 @@ export class ComponentsCommand extends Command {
         acc[component.type]!.push({ name, component })
         return acc
       },
-      {} as Record<string, Array<{ name: string; component: any }>>
+      {} as Record<string, ComponentEntry[]>
     )
 
     const types = Object.keys(byType)
@@ -376,8 +410,9 @@ export class ComponentsCommand extends Command {
         const { name, component } = components[compIdx]!
         const isLastComp = compIdx === components.length - 1
 
-        const versionTags = await this.tagManager.getVersionTags(name)
-        const deploymentTags = await this.tagManager.getDeploymentTags(name)
+        const entityType = componentTypeToEntityType(component.type)
+        const versionTags = await this.tagManager.getVersionTags(name, entityType)
+        const deploymentTags = await this.tagManager.getDeploymentTags(name, entityType)
 
         // Apply limit
         const versions = limit ? versionTags.slice(-limit) : versionTags
@@ -391,7 +426,7 @@ export class ComponentsCommand extends Command {
           const isLastVer = verIdx === versions.length - 1 && deploymentTags.length === 0
 
           try {
-            const tagInfo = await this.tagManager.getTagInfo(name, version)
+            const tagInfo = await this.tagManager.getTagInfo(name, version, entityType)
             // Handle invalid dates gracefully
             let date = 'unknown'
             if (tagInfo.date) {
@@ -410,7 +445,7 @@ export class ComponentsCommand extends Command {
             const deployedAs: string[] = []
             for (const depTag of deploymentTags) {
               try {
-                const depSHA = await this.tagManager.getTagSHA(name, depTag)
+                const depSHA = await this.tagManager.getTagSHA(name, depTag, entityType)
                 if (process.env.DEBUG) {
                   console.error(
                     `  [DEBUG] Comparing: version ${version} SHA=${tagInfo.sha} vs ${depTag} SHA=${depSHA}`
@@ -464,18 +499,20 @@ export class ComponentsCommand extends Command {
     console.log(`Path: ${component.path}`)
     console.log(`Type: ${component.type}`)
 
+    const entityType = componentTypeToEntityType(component.type)
+
     try {
       // Get all tags for this component
-      const allTags = await this.tagManager.listComponentTags(componentName)
-      const versionTags = await this.tagManager.getVersionTags(componentName)
-      const deploymentTags = await this.tagManager.getDeploymentTags(componentName)
+      const allTags = await this.tagManager.listTags(componentName, entityType)
+      const versionTags = await this.tagManager.getVersionTags(componentName, entityType)
+      const deploymentTags = await this.tagManager.getDeploymentTags(componentName, entityType)
 
       // Show version tags
       if (versionTags.length > 0) {
         console.log('\n🏷️  Version Tags:')
         for (const version of versionTags) {
           try {
-            const tagInfo = await this.tagManager.getTagInfo(componentName, version)
+            const tagInfo = await this.tagManager.getTagInfo(componentName, version, entityType)
             console.log(
               `   ${version} - ${tagInfo.sha.substring(0, 8)} - ${tagInfo.date} - ${tagInfo.message}`
             )
@@ -490,13 +527,13 @@ export class ComponentsCommand extends Command {
         console.log('\n🚀 Deployment Tags:')
         for (const env of deploymentTags) {
           try {
-            const tagInfo = await this.tagManager.getTagInfo(componentName, env)
+            const tagInfo = await this.tagManager.getTagInfo(componentName, env, entityType)
 
             // Find which version this points to
             let pointsToVersion = 'custom'
             for (const version of versionTags) {
               try {
-                const versionSHA = await this.tagManager.getTagSHA(componentName, version)
+                const versionSHA = await this.tagManager.getTagSHA(componentName, version, entityType)
                 if (versionSHA === tagInfo.sha) {
                   pointsToVersion = version
                   break
@@ -657,13 +694,13 @@ export class ComponentsCommand extends Command {
     }
 
     // Validate type
-    const validTypes = ['prompt', 'agent', 'sql', 'config']
-    if (!validTypes.includes(componentType)) {
+    const validTypes: ComponentType[] = ['prompt', 'script', 'query', 'config']
+    if (!validTypes.includes(componentType as ComponentType)) {
       throw new Error(`Invalid component type. Must be one of: ${validTypes.join(', ')}`)
     }
 
     // Create component
-    const component = ComponentUtils.createComponent(filePath, componentType as any)
+    const component = ComponentUtils.createComponent(filePath, componentType as ComponentType)
 
     // Add to registry
     ComponentUtils.addComponent(registry, name, component)
@@ -690,17 +727,21 @@ export class ComponentsCommand extends Command {
     }
 
     // Warn about Git tags
-    try {
-      const tags = await this.tagManager.listComponentTags(componentName)
-      if (tags.length > 0 && !flags.force) {
-        console.log(`⚠️  Component '${componentName}' has ${tags.length} Git tags:`)
-        console.log(`   ${tags.join(', ')}`)
-        console.log('\n   Use --force to remove anyway (Git tags will remain)')
-        console.log('   Or manually delete tags first with: edgit tag delete <component>@<tag>')
-        return
+    const component = ComponentUtils.findComponentByName(registry, componentName)
+    if (component) {
+      try {
+        const entityType = componentTypeToEntityType(component.type)
+        const tags = await this.tagManager.listTags(componentName, entityType)
+        if (tags.length > 0 && !flags.force) {
+          console.log(`⚠️  Component '${componentName}' has ${tags.length} Git tags:`)
+          console.log(`   ${tags.join(', ')}`)
+          console.log('\n   Use --force to remove anyway (Git tags will remain)')
+          console.log('   Or manually delete tags first with: edgit tag delete <component>@<tag>')
+          return
+        }
+      } catch {
+        // Continue if we can't get tag info
       }
-    } catch {
-      // Continue if we can't get tag info
     }
 
     ComponentUtils.removeComponent(registry, componentName)
@@ -716,13 +757,14 @@ export class ComponentsCommand extends Command {
    */
   private async showComponentSummary(
     name: string,
-    component: any,
+    component: Component & { untracked?: boolean },
     verbose: boolean,
     limit?: number
   ): Promise<void> {
     try {
-      const allVersionTags = await this.tagManager.getVersionTags(name)
-      const deploymentTags = await this.tagManager.getDeploymentTags(name)
+      const entityType = componentTypeToEntityType(component.type)
+      const allVersionTags = await this.tagManager.getVersionTags(name, entityType)
+      const deploymentTags = await this.tagManager.getDeploymentTags(name, entityType)
 
       // Apply limit if specified
       const versionTags = limit && limit > 0 ? allVersionTags.slice(-limit) : allVersionTags

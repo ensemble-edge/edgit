@@ -24,6 +24,7 @@ import { ScanCommand } from './commands/scan.js'
 import { PatternsCommand } from './commands/patterns.js'
 import { HistoryCommand } from './commands/history.js'
 import { RegisterCommand } from './commands/register.js'
+import { EdgitError, isEdgitError } from './errors/index.js'
 import process from 'process'
 import path from 'path'
 import fs from 'fs/promises'
@@ -107,7 +108,7 @@ async function validateWorkspace(workspaceDir: string): Promise<string> {
   try {
     const stat = await fs.stat(workspaceDir)
     if (!stat.isDirectory()) {
-      throw new Error(`${workspaceDir} is not a directory`)
+      throw new EdgitError('WORKSPACE_ERROR', `${workspaceDir} is not a directory`)
     }
 
     const absolutePath = path.resolve(workspaceDir)
@@ -116,17 +117,21 @@ async function validateWorkspace(workspaceDir: string): Promise<string> {
     try {
       await fs.access(path.join(absolutePath, '.git'))
     } catch {
-      throw new Error(
+      throw new EdgitError(
+        'GIT_NOT_INITIALIZED',
         `${absolutePath} is not a git repository. Please run "git init" first, then "edgit setup".`
       )
     }
 
     return absolutePath
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
-      throw new Error(`ENOENT: no such file or directory, stat '${workspaceDir}'`)
+  } catch (error: unknown) {
+    if (isEdgitError(error)) {
+      throw error
     }
-    throw error
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      throw new EdgitError('FILE_NOT_FOUND', `No such file or directory: '${workspaceDir}'`)
+    }
+    throw EdgitError.from(error, 'WORKSPACE_ERROR')
   }
 }
 
@@ -251,19 +256,12 @@ async function main(): Promise<void> {
     } // Set working directory if specified
     let workspaceDir = parsed.workspace
     if (parsed.command !== 'init' && parsed.command !== 'setup') {
-      try {
-        workspaceDir = await validateWorkspace(workspaceDir || process.cwd())
-        process.chdir(workspaceDir)
+      workspaceDir = await validateWorkspace(workspaceDir || process.cwd())
+      process.chdir(workspaceDir)
 
-        // Show workspace info if different from original cwd
-        if (parsed.options.workspace) {
-          console.log(`📁 Working in: ${workspaceDir}\n`)
-        }
-      } catch (error: any) {
-        if (parsed.command !== 'help' && parsed.command !== 'version') {
-          console.error(`❌ Failed to validate workspace directory: ${error.message}`)
-          process.exit(1)
-        }
+      // Show workspace info if different from original cwd
+      if (parsed.options.workspace) {
+        console.log(`📁 Working in: ${workspaceDir}\n`)
       }
     }
 
@@ -387,8 +385,10 @@ async function main(): Promise<void> {
         await gitPassthrough.passthrough([command, ...args])
         break
     }
-  } catch (error: any) {
-    console.error(`❌ ${error.message}`)
+  } catch (error: unknown) {
+    // Convert to EdgitError if needed and display
+    const edgitErr = isEdgitError(error) ? error : EdgitError.from(error)
+    console.error(edgitErr.toCliMessage())
     process.exit(1)
   }
 }
@@ -406,8 +406,10 @@ const isDirectExecution =
     calledScript.includes('edgit')) // npm bin symlink
 
 if (isDirectExecution) {
-  main().catch((error) => {
-    console.error('❌', error.message || error)
+  main().catch((error: unknown) => {
+    // This catch handles errors that escape main()'s try/catch (shouldn't happen)
+    const edgitErr = isEdgitError(error) ? error : EdgitError.from(error)
+    console.error(edgitErr.toCliMessage())
     process.exit(1)
   })
 }

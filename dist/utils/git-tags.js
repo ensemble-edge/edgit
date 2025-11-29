@@ -1,7 +1,7 @@
 /**
  * Git Tag Manager for Edgit component and agent versioning and deployment
  * Handles namespaced tags with separation between version and deployment tags
- * Supports both components/ and agents/ namespaces
+ * Uses type-specific namespaces (prompts/, schemas/, templates/, etc.)
  */
 export class GitTagManager {
     git;
@@ -10,9 +10,29 @@ export class GitTagManager {
     }
     /**
      * Get namespace prefix for entity type
+     * Pluralizes the type name to create the namespace
+     *
+     * Examples:
+     * - 'agent' → 'agents'
+     * - 'prompt' → 'prompts'
+     * - 'schema' → 'schemas'
+     * - 'query' → 'queries' (special case)
+     * - 'component' → 'components' (legacy)
      */
     getNamespace(entityType) {
-        return entityType === 'agent' ? 'agents' : 'components';
+        // Handle special cases
+        switch (entityType) {
+            case 'agent':
+            case 'agent-definition':
+                return 'agents';
+            case 'query':
+                return 'queries'; // Special pluralization
+            case 'component':
+                return 'components'; // Legacy support
+            default:
+                // Standard pluralization: add 's'
+                return `${entityType}s`;
+        }
     }
     /**
      * Create a namespaced tag for component or agent
@@ -35,9 +55,11 @@ export class GitTagManager {
     }
     /**
      * Create a namespaced component tag (backward compatible)
-     * @deprecated Use tag() with entityType parameter instead
+     * @deprecated Use tag() with specific entityType (prompt, schema, template, etc.) instead
      */
     async tagComponent(component, tagName, sha, message) {
+        // Legacy: uses generic 'components/' namespace
+        // For type-specific namespaces, use tag() with the actual type
         return this.tag(component, tagName, 'component', sha, message);
     }
     /**
@@ -320,9 +342,220 @@ export class GitTagManager {
     }
 }
 /**
+ * Result-based GitTagManager methods
+ * These provide explicit error handling without throwing exceptions
+ */
+export class GitTagManagerResult {
+    manager;
+    constructor(git) {
+        this.manager = new GitTagManager(git);
+    }
+    /**
+     * Create a tag with Result-based error handling
+     */
+    async createTag(name, tagName, entityType = 'component', sha, message) {
+        try {
+            const gitTag = await this.manager.tag(name, tagName, entityType, sha, message);
+            return { ok: true, value: gitTag };
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (errorMessage.includes('already exists')) {
+                return {
+                    ok: false,
+                    error: {
+                        kind: 'tag_exists',
+                        tag: tagName,
+                        message: errorMessage,
+                    },
+                };
+            }
+            return {
+                ok: false,
+                error: {
+                    kind: 'git_error',
+                    message: errorMessage,
+                },
+            };
+        }
+    }
+    /**
+     * Create an immutable version tag with Result-based error handling
+     */
+    async createVersionTag(name, version, entityType = 'component', sha, message) {
+        try {
+            const gitTag = await this.manager.createVersionTag(name, version, entityType, sha, message);
+            return { ok: true, value: gitTag };
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (errorMessage.includes('already exists')) {
+                return {
+                    ok: false,
+                    error: {
+                        kind: 'tag_exists',
+                        tag: version,
+                        message: errorMessage,
+                    },
+                };
+            }
+            return {
+                ok: false,
+                error: {
+                    kind: 'git_error',
+                    message: errorMessage,
+                },
+            };
+        }
+    }
+    /**
+     * Get tag SHA with Result-based error handling
+     */
+    async getTagSHA(name, tagName, entityType = 'component') {
+        try {
+            const sha = await this.manager.getTagSHA(name, tagName, entityType);
+            return { ok: true, value: sha };
+        }
+        catch (error) {
+            return {
+                ok: false,
+                error: {
+                    kind: 'tag_not_found',
+                    tag: tagName,
+                    message: error instanceof Error ? error.message : String(error),
+                },
+            };
+        }
+    }
+    /**
+     * Get tag info with Result-based error handling
+     */
+    async getTagInfo(name, tagName, entityType = 'component') {
+        try {
+            const info = await this.manager.getTagInfo(name, tagName, entityType);
+            return { ok: true, value: info };
+        }
+        catch (error) {
+            return {
+                ok: false,
+                error: {
+                    kind: 'tag_not_found',
+                    tag: tagName,
+                    message: error instanceof Error ? error.message : String(error),
+                },
+            };
+        }
+    }
+    /**
+     * Resolve a reference with Result-based error handling
+     */
+    async resolveRef(name, ref, entityType = 'component') {
+        try {
+            const sha = await this.manager.resolveRef(name, ref, entityType);
+            return { ok: true, value: sha };
+        }
+        catch (error) {
+            return {
+                ok: false,
+                error: {
+                    kind: 'invalid_ref',
+                    ref,
+                    message: error instanceof Error ? error.message : String(error),
+                },
+            };
+        }
+    }
+    /**
+     * Get file content at tag with Result-based error handling
+     */
+    async getFileAtTag(name, tagName, filePath, entityType = 'component') {
+        try {
+            const content = await this.manager.getFileAtTag(name, tagName, filePath, entityType);
+            return { ok: true, value: content };
+        }
+        catch (error) {
+            return {
+                ok: false,
+                error: {
+                    kind: 'file_not_found',
+                    path: filePath,
+                    tag: tagName,
+                    message: error instanceof Error ? error.message : String(error),
+                },
+            };
+        }
+    }
+    /**
+     * Move deployment tag with Result-based error handling
+     */
+    async moveDeploymentTag(name, env, targetRef, entityType = 'component', message) {
+        try {
+            const gitTag = await this.manager.moveDeploymentTag(name, env, targetRef, entityType, message);
+            return { ok: true, value: gitTag };
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (errorMessage.includes('Could not resolve')) {
+                return {
+                    ok: false,
+                    error: {
+                        kind: 'invalid_ref',
+                        ref: targetRef,
+                        message: errorMessage,
+                    },
+                };
+            }
+            return {
+                ok: false,
+                error: {
+                    kind: 'git_error',
+                    message: errorMessage,
+                },
+            };
+        }
+    }
+    /**
+     * Delete a tag with Result-based error handling
+     */
+    async deleteTag(name, tagName, entityType = 'component', deleteRemote = false) {
+        try {
+            await this.manager.deleteTag(name, tagName, entityType, deleteRemote);
+            return { ok: true, value: undefined };
+        }
+        catch (error) {
+            return {
+                ok: false,
+                error: {
+                    kind: 'tag_not_found',
+                    tag: tagName,
+                    message: error instanceof Error ? error.message : String(error),
+                },
+            };
+        }
+    }
+    /**
+     * Access the underlying manager for non-Result methods
+     */
+    get underlying() {
+        return this.manager;
+    }
+    // Passthrough methods that don't throw
+    listTags = (name, entityType) => this.manager.listTags(name, entityType);
+    tagExists = (name, tagName, entityType) => this.manager.tagExists(name, tagName, entityType);
+    getVersionTags = (name, entityType) => this.manager.getVersionTags(name, entityType);
+    getDeploymentTags = (name, entityType) => this.manager.getDeploymentTags(name, entityType);
+    pushTags = (name, entityType, tagNames, force) => this.manager.pushTags(name, entityType, tagNames, force);
+}
+/**
  * Convenience function to create GitTagManager instance
  */
 export function createGitTagManager(git) {
     return new GitTagManager(git);
+}
+/**
+ * Create a Result-based GitTagManager for explicit error handling
+ */
+export function createGitTagManagerWithResult(git) {
+    return new GitTagManagerResult(git);
 }
 //# sourceMappingURL=git-tags.js.map

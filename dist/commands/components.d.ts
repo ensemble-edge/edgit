@@ -29,6 +29,9 @@ export declare class ComponentsCommand extends Command {
     /**
      * List components in JSON format
      */
+    /**
+     * JSON output structure for components
+     */
     private listComponentsJSON;
     /**
      * List components in YAML format

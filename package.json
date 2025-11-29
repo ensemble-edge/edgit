@@ -3,7 +3,18 @@
   "version": "0.3.0",
   "type": "module",
   "description": "Git tag-based versioning for AI components and agents. Independent versioning for prompts, configs, queries, scripts, and agent definitions.",
-  "main": "dist/index.js",
+  "main": "dist/lib/index.js",
+  "types": "dist/lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/lib/index.d.ts",
+      "import": "./dist/lib/index.js"
+    },
+    "./cli": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "files": [
     "dist/",
     "README.md",
@@ -58,6 +69,7 @@
   },
   "dependencies": {
     "dotenv": "^17.2.3",
-    "minimatch": "^10.1.1"
+    "minimatch": "^10.1.1",
+    "zod": "^4.1.13"
   }
 }

@@ -3,6 +3,9 @@ import type { ComponentDetector } from '../utils/component-detector.js';
 /**
  * Base command handler for Edgit
  * Provides common functionality and defines the interface for all commands
+ *
+ * Commands receive a GitWrapper instance via constructor injection.
+ * If not provided, a new instance bound to process.cwd() is created.
  */
 export declare abstract class Command {
     protected git: GitWrapper;
@@ -10,9 +13,15 @@ export declare abstract class Command {
     protected context?: CommandContext;
     static readonly INTERCEPTED_COMMANDS: string[];
     static readonly ENHANCED_COMMANDS: string[];
+    /**
+     * Create a command with optional dependency injection
+     * @param git - GitWrapper instance (defaults to new instance for process.cwd())
+     * @param detector - Optional component detector
+     */
     constructor(git?: GitWrapper, detector?: ComponentDetector);
     /**
-     * Set command context (including workspace directory)
+     * Set command context
+     * Note: The git workspace is immutable - use constructor injection for workspace control
      */
     setContext(context: CommandContext): void;
     /**
@@ -117,6 +126,7 @@ export interface CommandContext {
 }
 /**
  * Create command execution context
+ * @param workspaceDir - Optional workspace directory (defaults to process.cwd())
  */
 export declare function createCommandContext(workspaceDir?: string): Promise<CommandContext>;
 //# sourceMappingURL=base.d.ts.map

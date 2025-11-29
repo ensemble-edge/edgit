@@ -1,4 +1,5 @@
 import { Command } from './base.js';
+import type { EntityType } from '../utils/git-tags.js';
 /**
  * Tag command for creating and managing component version and deployment tags
  * Replaces stored versioning with Git's native tag system
@@ -6,6 +7,10 @@ import { Command } from './base.js';
 export declare class TagCommand extends Command {
     private tagManager;
     constructor();
+    /**
+     * Extract --format option from args
+     */
+    private extractFormat;
     execute(args: string[]): Promise<void>;
     /**
      * Create a version or deployment tag
@@ -16,23 +21,23 @@ export declare class TagCommand extends Command {
     /**
      * Create an immutable version tag (v1.0.0)
      */
-    createVersionTag(componentName: string, version: string, sha?: string): Promise<void>;
+    createVersionTag(componentName: string, version: string, entityType: EntityType, sha?: string): Promise<void>;
     /**
      * Create or move a deployment tag (prod, staging, etc.)
      */
-    createDeploymentTag(componentName: string, env: string, targetRef?: string): Promise<void>;
+    createDeploymentTag(componentName: string, env: string, entityType: EntityType, targetRef?: string): Promise<void>;
     /**
      * Create a custom tag
      */
-    createCustomTag(componentName: string, tagName: string, sha?: string): Promise<void>;
+    createCustomTag(componentName: string, tagName: string, entityType: EntityType, sha?: string): Promise<void>;
     /**
      * List tags for a component or all components
-     * Usage: edgit tag list [component]
+     * Usage: edgit tag list [component] [--format json]
      */
     listTags(args: string[]): Promise<void>;
     /**
      * Show detailed information about a specific tag
-     * Usage: edgit tag show <component>@<tag>
+     * Usage: edgit tag show <component>@<tag> [--format json]
      */
     showTag(args: string[]): Promise<void>;
     /**
@@ -57,6 +62,10 @@ export declare class TagCommand extends Command {
      * List tags for all components
      */
     private listAllComponentTags;
+    /**
+     * Get tag data for a component (used for JSON output)
+     */
+    private getComponentTagData;
     /**
      * List tags for a specific component
      */

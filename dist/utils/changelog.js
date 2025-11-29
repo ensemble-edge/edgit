@@ -37,7 +37,8 @@ export class ChangelogManager {
             return await fs.readFile(this.filePath, 'utf8');
         }
         catch (error) {
-            if (error.code === 'ENOENT') {
+            // Check for ENOENT (file not found) error
+            if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
                 // Create new changelog with standard template
                 return this.createChangelogTemplate();
             }

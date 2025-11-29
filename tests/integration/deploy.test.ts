@@ -36,7 +36,8 @@ describe('edgit deploy', () => {
     expect(result.exitCode).toBe(0)
 
     const tags = await repo.listTags()
-    expect(tags).toContain('components/test-prompt/prod')
+    // Tags now use type-specific namespaces: prompts/ for prompt components
+    expect(tags).toContain('prompts/test-prompt/prod')
   })
 
   it('should move deployment tag to new version', async () => {
@@ -61,8 +62,9 @@ describe('edgit deploy', () => {
     expect(result.exitCode).toBe(0)
 
     // Verify prod now points to v2.0.0
-    const prodSha = await repo.getTagSha('components/test-prompt/prod')
-    const v2Sha = await repo.getTagSha('components/test-prompt/v2.0.0')
+    // Tags now use type-specific namespaces: prompts/ for prompt components
+    const prodSha = await repo.getTagSha('prompts/test-prompt/prod')
+    const v2Sha = await repo.getTagSha('prompts/test-prompt/v2.0.0')
     expect(prodSha).toBe(v2Sha)
   })
 

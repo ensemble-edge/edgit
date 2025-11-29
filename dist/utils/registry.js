@@ -1,6 +1,12 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 /**
+ * Type guard for NodeJS filesystem errors with error codes
+ */
+function isNodeError(error) {
+    return error instanceof Error && 'code' in error;
+}
+/**
  * Registry loader class - eliminates duplication across 4+ command files
  * Handles loading and saving component registry with proper error handling
  */
@@ -23,7 +29,7 @@ export class RegistryLoader {
             return { ok: true, value: registry };
         }
         catch (error) {
-            if (error.code === 'ENOENT') {
+            if (isNodeError(error) && error.code === 'ENOENT') {
                 return {
                     ok: false,
                     error: {
@@ -32,13 +38,18 @@ export class RegistryLoader {
                     },
                 };
             }
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            const parseError = {
+                kind: 'parse_error',
+                message: `Failed to load registry: ${errorMessage}`,
+            };
+            // Only add cause if it's an Error (satisfies exactOptionalPropertyTypes)
+            if (error instanceof Error) {
+                parseError.cause = error;
+            }
             return {
                 ok: false,
-                error: {
-                    kind: 'parse_error',
-                    message: `Failed to load registry: ${error.message}`,
-                    cause: error,
-                },
+                error: parseError,
             };
         }
     }
