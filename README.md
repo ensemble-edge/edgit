@@ -189,9 +189,9 @@ Deploy HTML, Email, and PDF templates with instant versioning:
 
 ```yaml
 # ensemble.yaml
-members:
+agents:
   - name: send-welcome
-    type: Email
+    operation: email
     config:
       # Load versioned template from Edgit
       template: template://welcome-email@v1.0.0
@@ -218,13 +218,13 @@ edgit tag create welcome-email v2.0.0
 
 ### Prompts in Conductor
 
-Version AI prompts for Think members:
+Version AI prompts for Think agents:
 
 ```yaml
 # ensemble.yaml
-members:
+agents:
   - name: analyze-company
-    type: Think
+    operation: think
     config:
       # Load versioned prompt from Edgit
       prompt: prompt://company-analysis@v2.0.0
@@ -334,10 +334,9 @@ All protocols use the same URI format: `{protocol}://{path}[@{version}]`
 
 ### Learn More
 
-- **[Component Types Guide](../docs/edgit/guides/component-types.mdx)** - Templates and Prompts as first-class components
-- **[Conductor HTML Member](../docs/conductor/member-types/html.mdx)** - Using templates in HTML/Email/PDF generation
-- **[Component Caching](../docs/conductor/concepts/caching.mdx)** - Edge caching strategies for components
-- **[HTML Components Example](../docs/conductor/examples/html-components.mdx)** - Complete dashboard with versioned components
+- **[Versioning Guide](https://docs.ensemble.ai/edgit/guides/versioning-components-agents)** - Version components and agents
+- **[Conductor HTML Operation](https://docs.ensemble.ai/conductor/operations/html)** - Using templates in HTML/Email/PDF generation
+- **[Starter Kit](https://docs.ensemble.ai/conductor/starter-kit/overview)** - Production-ready agents and ensembles
 
 ## Quick Start
 
@@ -1023,8 +1022,9 @@ edgit tag create my-agent v2.0.0    # Version on main
 
 ## Documentation
 
-- 📖 **[Full Documentation](./docs/)** - Complete guides and API reference
-- 🚀 **[Getting Started](./docs/quickstart.mdx)** - Detailed setup and first steps
+- 📖 **[Full Documentation](https://docs.ensemble.ai/edgit/overview)** - Complete guides and API reference
+- 🚀 **[Getting Started](https://docs.ensemble.ai/edgit/getting-started/installation)** - Detailed setup and first steps
+- 🔀 **[Versioning Guide](https://docs.ensemble.ai/edgit/guides/versioning-components-agents)** - Component versioning patterns
 - 💡 **[Examples](./examples/)** - Real-world usage patterns
 
 ## Development & Contributing
