@@ -192,9 +192,7 @@ export class ComponentsCommand extends Command {
    * Find untracked components (files that exist but aren't in registry)
    * Leverages existing ComponentDetector and file discovery infrastructure
    */
-  private async findUntrackedComponents(
-    registry: ComponentRegistry
-  ): Promise<ComponentEntry[]> {
+  private async findUntrackedComponents(registry: ComponentRegistry): Promise<ComponentEntry[]> {
     const untrackedComponents: ComponentEntry[] = []
 
     // Use ComponentDetector to identify component files
@@ -533,7 +531,11 @@ export class ComponentsCommand extends Command {
             let pointsToVersion = 'custom'
             for (const version of versionTags) {
               try {
-                const versionSHA = await this.tagManager.getTagSHA(componentName, version, entityType)
+                const versionSHA = await this.tagManager.getTagSHA(
+                  componentName,
+                  version,
+                  entityType
+                )
                 if (versionSHA === tagInfo.sha) {
                   pointsToVersion = version
                   break

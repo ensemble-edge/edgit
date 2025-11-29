@@ -15,7 +15,17 @@ export interface PatternsOptions {
 }
 
 /** Valid component types for pattern detection */
-const COMPONENT_TYPES: ComponentType[] = ['prompt', 'template', 'query', 'config', 'script', 'schema', 'agent-definition', 'ensemble', 'tool']
+const COMPONENT_TYPES: ComponentType[] = [
+  'prompt',
+  'template',
+  'query',
+  'config',
+  'script',
+  'schema',
+  'agent-definition',
+  'ensemble',
+  'tool',
+]
 
 /**
  * Patterns command for managing component detection patterns
@@ -379,19 +389,16 @@ Examples:
   }
 
   private async promptForType(): Promise<ComponentType> {
-    const type = await this.prompt.select(
-      'Select component type:',
-      COMPONENT_TYPES,
-      { defaultIndex: 1 }
-    )
+    const type = await this.prompt.select('Select component type:', COMPONENT_TYPES, {
+      defaultIndex: 1,
+    })
     return type
   }
 
   private async promptForDescription(pattern: string, type: ComponentType): Promise<string> {
-    const description = await this.prompt.input(
-      'Enter description:',
-      { default: `Custom ${type} pattern for ${pattern}` }
-    )
+    const description = await this.prompt.input('Enter description:', {
+      default: `Custom ${type} pattern for ${pattern}`,
+    })
     return description
   }
 

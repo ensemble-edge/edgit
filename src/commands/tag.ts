@@ -311,26 +311,38 @@ export class TagCommand extends Command {
    */
   async deleteTag(args: string[]): Promise<void> {
     if (args.length === 0) {
-      throw new EdgitError('VALIDATION_ERROR', 'Usage: edgit tag delete <component>@<tag> [--remote]')
+      throw new EdgitError(
+        'VALIDATION_ERROR',
+        'Usage: edgit tag delete <component>@<tag> [--remote]'
+      )
     }
 
     const spec = args[0]
     if (!spec) {
-      throw new EdgitError('VALIDATION_ERROR', 'Usage: edgit tag delete <component>@<tag> [--remote]')
+      throw new EdgitError(
+        'VALIDATION_ERROR',
+        'Usage: edgit tag delete <component>@<tag> [--remote]'
+      )
     }
 
     const deleteRemote = args.includes('--remote')
     const parts = spec.split('@')
 
     if (parts.length !== 2) {
-      throw new EdgitError('VALIDATION_ERROR', 'Usage: edgit tag delete <component>@<tag> [--remote]')
+      throw new EdgitError(
+        'VALIDATION_ERROR',
+        'Usage: edgit tag delete <component>@<tag> [--remote]'
+      )
     }
 
     const componentName = parts[0]
     const tagName = parts[1]
 
     if (!componentName || !tagName) {
-      throw new EdgitError('VALIDATION_ERROR', 'Usage: edgit tag delete <component>@<tag> [--remote]')
+      throw new EdgitError(
+        'VALIDATION_ERROR',
+        'Usage: edgit tag delete <component>@<tag> [--remote]'
+      )
     }
 
     // Verify component exists
@@ -574,9 +586,7 @@ export class TagCommand extends Command {
       if (standalone) {
         throw EdgitError.from(error, 'GIT_ERROR')
       }
-      console.log(
-        `   ⚠️ Failed to list tags: ${error instanceof Error ? error.message : error}`
-      )
+      console.log(`   ⚠️ Failed to list tags: ${error instanceof Error ? error.message : error}`)
     }
   }
 

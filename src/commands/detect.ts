@@ -1,7 +1,12 @@
 import { Command } from './base.js'
 import { ComponentDetector } from '../utils/component-detector.js'
 import { fileHeaderManager, type ComponentMetadata } from '../utils/file-headers.js'
-import { ComponentUtils, type ComponentRegistry, type ComponentType, type Component } from '../models/components.js'
+import {
+  ComponentUtils,
+  type ComponentRegistry,
+  type ComponentType,
+  type Component,
+} from '../models/components.js'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 

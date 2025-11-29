@@ -83,7 +83,10 @@ export class DeployCommand extends Command {
     const environment = args[toIndex + 1]
 
     if (!componentName || !version || !environment) {
-      throw new EdgitError('VALIDATION_ERROR', 'Component name, version, and environment are required')
+      throw new EdgitError(
+        'VALIDATION_ERROR',
+        'Component name, version, and environment are required'
+      )
     }
 
     // Load registry to verify component exists
@@ -424,7 +427,11 @@ export class DeployCommand extends Command {
 
         for (const versionTag of versionTags) {
           try {
-            const versionSHA = await this.tagManager.getTagSHA(componentName, versionTag, entityType)
+            const versionSHA = await this.tagManager.getTagSHA(
+              componentName,
+              versionTag,
+              entityType
+            )
             if (versionSHA === sha) {
               matchingVersions.push(versionTag)
             }
@@ -485,7 +492,11 @@ export class DeployCommand extends Command {
 
         for (const versionTag of versionTags) {
           try {
-            const versionSHA = await this.tagManager.getTagSHA(componentName, versionTag, entityType)
+            const versionSHA = await this.tagManager.getTagSHA(
+              componentName,
+              versionTag,
+              entityType
+            )
             if (versionSHA === sha) {
               version = versionTag
               break
