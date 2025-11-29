@@ -1,5 +1,24 @@
 # @ensemble-edge/edgit
 
+## 0.4.1
+
+### Patch Changes
+
+- 3d55ade: ### Code Quality & Error Handling
+  - Add `EdgitError` class with typed error kinds for better error categorization
+  - Implement `Result<T, E>` pattern for explicit, type-safe error handling
+  - Add Zod validation for CLI inputs with user-friendly error messages
+  - Add interactive prompt utilities for consistent CLI interactions
+
+  ### Developer Experience
+  - Add `tool` to supported component types
+  - Export programmatic API for library usage
+  - Update README with documentation links
+
+  ### Maintenance
+  - Remove unused conventional-changelog dependency
+  - Code formatting with Prettier
+
 ## 0.4.0
 
 ### Minor Changes
