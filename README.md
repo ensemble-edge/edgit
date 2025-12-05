@@ -3,7 +3,12 @@
 *Every version of every component that ever existed is still there. Edgit just makes them visible.*
 
 ```bash
-npm install -g @ensemble-edge/edgit
+# Recommended: Via unified Ensemble CLI
+pnpm add -g @ensemble-edge/ensemble
+ensemble edgit --help
+
+# Alternative: Direct installation
+pnpm add -g @ensemble-edge/edgit
 ```
 
 **Git tag-based component and agent versioning for AI systems.** The multiverse already exists in your Git history - every version of every component and agent lives in your commits. Edgit makes them accessible through native Git tags, eliminating merge conflicts while unlocking independent versioning for components and agents.
