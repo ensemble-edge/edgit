@@ -24,7 +24,7 @@ import { EdgitError, isEdgitError } from './errors/index.js';
 import process from 'process';
 import path from 'path';
 import fs from 'fs/promises';
-import { banners, log, colors } from '@ensemble-edge/ensemble/ui';
+import { banners, log, colors } from './utils/ui.js';
 /**
  * Parse command line arguments with support for global options
  */

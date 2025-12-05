@@ -1,6 +1,6 @@
 import { GitWrapper } from '../utils/git.js';
 import * as path from 'path';
-import { log, colors } from '@ensemble-edge/ensemble/ui';
+import { log, colors } from '../utils/ui.js';
 /**
  * Base command handler for Edgit
  * Provides common functionality and defines the interface for all commands

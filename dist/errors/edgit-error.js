@@ -4,7 +4,7 @@
  * Replaces process.exit(1) calls with throwable errors,
  * enabling proper testing and error recovery.
  */
-import { statusIcons } from '@ensemble-edge/ensemble/ui';
+import { statusIcons } from '../utils/ui.js';
 /**
  * EdgitError class with typed error codes
  *

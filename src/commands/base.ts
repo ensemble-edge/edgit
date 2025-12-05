@@ -1,7 +1,7 @@
 import { GitWrapper } from '../utils/git.js'
 import type { ComponentDetector } from '../utils/component-detector.js'
 import * as path from 'path'
-import { log, colors } from '@ensemble-edge/ensemble/ui'
+import { log, colors } from '../utils/ui.js'
 
 /**
  * Base command handler for Edgit
