@@ -3,7 +3,17 @@ import { ComponentDetector } from '../utils/component-detector.js';
 import { createPrompt } from '../utils/prompt.js';
 import * as fs from 'fs/promises';
 /** Valid component types for pattern detection */
-const COMPONENT_TYPES = ['prompt', 'template', 'query', 'config', 'script', 'schema', 'agent-definition', 'ensemble', 'tool'];
+const COMPONENT_TYPES = [
+    'prompt',
+    'template',
+    'query',
+    'config',
+    'script',
+    'schema',
+    'agent-definition',
+    'ensemble',
+    'tool',
+];
 /**
  * Patterns command for managing component detection patterns
  */
@@ -301,11 +311,15 @@ Examples:
         }
     }
     async promptForType() {
-        const type = await this.prompt.select('Select component type:', COMPONENT_TYPES, { defaultIndex: 1 });
+        const type = await this.prompt.select('Select component type:', COMPONENT_TYPES, {
+            defaultIndex: 1,
+        });
         return type;
     }
     async promptForDescription(pattern, type) {
-        const description = await this.prompt.input('Enter description:', { default: `Custom ${type} pattern for ${pattern}` });
+        const description = await this.prompt.input('Enter description:', {
+            default: `Custom ${type} pattern for ${pattern}`,
+        });
         return description;
     }
     async confirmAction(message) {

@@ -5,6 +5,8 @@
  * enabling proper testing and error recovery.
  */
 
+import { statusIcons } from '@ensemble-edge/ensemble/ui'
+
 /**
  * Error codes for categorizing Edgit errors
  */
@@ -72,7 +74,7 @@ export class EdgitError extends Error {
    * Format for CLI display
    */
   toCliMessage(): string {
-    return `❌ ${this.message}`
+    return `${statusIcons.error} ${this.message}`
   }
 }
 

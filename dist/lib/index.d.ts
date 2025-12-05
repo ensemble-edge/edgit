@@ -20,8 +20,8 @@
  */
 export { GitWrapper, createGitWrapper } from '../utils/git.js';
 export { GitTagManager, GitTagManagerResult, createGitTagManager, createGitTagManagerWithResult, type EntityType, type GitTagError, type TagInfo, } from '../utils/git-tags.js';
-export { RegistryLoader, createRegistryLoader, type RegistryError, } from '../utils/registry.js';
-export { ComponentDetector, type DetectionPattern, } from '../utils/component-detector.js';
+export { RegistryLoader, createRegistryLoader, type RegistryError } from '../utils/registry.js';
+export { ComponentDetector, type DetectionPattern } from '../utils/component-detector.js';
 export { ComponentUtils, ComponentSpecParser, type Component, type ComponentRegistry, type ComponentType, type ComponentSpec, } from '../models/components.js';
 export { EdgitError, isEdgitError, type EdgitErrorCode, componentNotFound, componentExists, invalidVersion, tagNotFound, tagExists, registryNotFound, gitError, validationError, } from '../errors/index.js';
 export { Result, resultTry, resultTrySync, type Result as ResultType } from '../types/result.js';

@@ -1,5 +1,6 @@
 import { GitWrapper } from '../utils/git.js';
 import * as path from 'path';
+import { log, colors } from '@ensemble-edge/ensemble/ui';
 /**
  * Base command handler for Edgit
  * Provides common functionality and defines the interface for all commands
@@ -100,11 +101,12 @@ export class Command {
      * Show helpful error message with suggestions
      */
     showError(message, suggestions) {
-        console.error(`❌ ${message}`);
+        log.error(message);
         if (suggestions && suggestions.length > 0) {
-            console.error('\n💡 Suggestions:');
+            console.error('');
+            console.error(colors.accent('💡 Suggestions:'));
             suggestions.forEach((suggestion) => {
-                console.error(`   • ${suggestion}`);
+                console.error(`   ${colors.dim('•')} ${suggestion}`);
             });
         }
     }
@@ -112,19 +114,19 @@ export class Command {
      * Show success message
      */
     showSuccess(message) {
-        console.log(`✅ ${message}`);
+        log.success(message);
     }
     /**
      * Show info message
      */
     showInfo(message) {
-        console.log(`ℹ️  ${message}`);
+        log.info(message);
     }
     /**
      * Show warning message
      */
     showWarning(message) {
-        console.log(`⚠️  ${message}`);
+        log.warn(message);
     }
     /**
      * Parse common command line arguments

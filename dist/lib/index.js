@@ -29,11 +29,11 @@ export { GitTagManager, GitTagManagerResult, createGitTagManager, createGitTagMa
 // ============================================================================
 // Component Registry
 // ============================================================================
-export { RegistryLoader, createRegistryLoader, } from '../utils/registry.js';
+export { RegistryLoader, createRegistryLoader } from '../utils/registry.js';
 // ============================================================================
 // Component Detection
 // ============================================================================
-export { ComponentDetector, } from '../utils/component-detector.js';
+export { ComponentDetector } from '../utils/component-detector.js';
 // ============================================================================
 // Component Models & Utilities
 // ============================================================================

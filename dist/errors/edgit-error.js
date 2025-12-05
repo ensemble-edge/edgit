@@ -4,6 +4,7 @@
  * Replaces process.exit(1) calls with throwable errors,
  * enabling proper testing and error recovery.
  */
+import { statusIcons } from '@ensemble-edge/ensemble/ui';
 /**
  * EdgitError class with typed error codes
  *
@@ -43,7 +44,7 @@ export class EdgitError extends Error {
      * Format for CLI display
      */
     toCliMessage() {
-        return `❌ ${this.message}`;
+        return `${statusIcons.error} ${this.message}`;
     }
 }
 /**
