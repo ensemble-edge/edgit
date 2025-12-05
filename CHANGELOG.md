@@ -1,5 +1,14 @@
 # @ensemble-edge/edgit
 
+## 0.4.3
+
+### Patch Changes
+
+- d1145df: Documentation improvements:
+  - Update README with Cloudflare-native positioning
+  - Standardize CLI patterns to use npx @ensemble-edge/ensemble (no installation needed)
+  - Add edge deployment emphasis (50ms globally)
+
 ## 0.4.2
 
 ### Patch Changes
