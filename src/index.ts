@@ -28,6 +28,7 @@ import { EdgitError, isEdgitError } from './errors/index.js'
 import process from 'process'
 import path from 'path'
 import fs from 'fs/promises'
+import { banners, log, colors } from '@ensemble-edge/ensemble/ui'
 
 /**
  * Edgit CLI - Component-aware Git wrapper with comprehensive command system
@@ -139,31 +140,32 @@ async function validateWorkspace(workspaceDir: string): Promise<string> {
  * Show main help information
  */
 function showHelp(): void {
+  banners.edgit()
+  console.log('')
+  console.log(colors.dim('Git Tag-Based Component Versioning for AI Orchestration'))
   console.log(`
-🧩 Edgit - Git Tag-Based Component Versioning for AI Orchestration
-
-USAGE:
+${colors.bold('USAGE:')}
   edgit <command> [args...] [workspace-dir]
   edgit --workspace <dir> <command> [args...]
 
-GLOBAL OPTIONS:
+${colors.bold('GLOBAL OPTIONS:')}
   --workspace <dir>, -w <dir>  Set workspace directory
   --version, -v                Show version information
   --help, -h                   Show this help message
 
-CORE COMMANDS:
+${colors.bold('CORE COMMANDS:')}
   init                 Initialize edgit in current git repository
   commit [args...]     Commit with AI-powered commit messages
   status [args...]     Show git status with component information
 
-COMPONENT MANAGEMENT:
+${colors.bold('COMPONENT MANAGEMENT:')}
   components list      List all tracked components with Git tag info
   components show <name>       Show component details and version tags
   components checkout <comp@ref> Show component content at version/tag/SHA
   components add <name> <path> <type> Add new component to registry
   components remove <name>     Remove component from registry
 
-GIT TAG-BASED VERSIONING:
+${colors.bold('GIT TAG-BASED VERSIONING:')}
   tag create <comp> <version>  Create immutable version tag (v1.0.0)
   tag create <comp> <env>      Create/move deployment tag (prod, staging)
   tag list [component]         List tags for component(s)
@@ -171,52 +173,53 @@ GIT TAG-BASED VERSIONING:
   tag delete <comp>@<tag>      Delete a tag
   tag push [component]         Push tags to remote
 
-DEPLOYMENT MANAGEMENT:
+${colors.bold('DEPLOYMENT MANAGEMENT:')}
   deploy set <comp> <ver> --to <env>     Deploy version to environment
   deploy promote <comp> --from <src> --to <dst> Promote between environments
   deploy status [component]              Show deployment status
   deploy list [environment]              List deployments
   deploy rollback <comp> --env <env>     Rollback deployment
 
-DISCOVERY & ANALYSIS:
+${colors.bold('DISCOVERY & ANALYSIS:')}
   discover scan [options]      Find potential components
   discover detect <file>       Analyze specific file
   discover patterns [options]  Manage detection patterns
 
-SHORTCUTS:
+${colors.bold('SHORTCUTS:')}
   checkout <comp@ref>  Shortcut to components checkout
   
-EXAMPLES:
-  # Component management
-  edgit components add my-prompt prompts/test.md prompt
-  edgit components show extraction-prompt
-  edgit checkout extraction-prompt@v1.0.0
-  
-  # Git tag versioning
-  edgit tag create extraction-prompt v1.0.0    # Create version
-  edgit tag create extraction-prompt prod      # Create deployment tag
-  edgit tag list extraction-prompt             # List all tags
-  
-  # Deployment workflows
-  edgit deploy set extraction-prompt v1.0.0 --to staging
-  edgit deploy promote extraction-prompt --from staging --to prod
-  edgit deploy status                          # Show all deployments
-  
-  # Discovery
-  edgit discover scan --type prompt            # Find potential prompts
-  edgit commit                                 # AI-generated commit message
+${colors.bold('EXAMPLES:')}
+  ${colors.dim('# Component management')}
+  ${colors.accent('edgit components add my-prompt prompts/test.md prompt')}
+  ${colors.accent('edgit components show extraction-prompt')}
+  ${colors.accent('edgit checkout extraction-prompt@v1.0.0')}
 
-KEY CONCEPTS:
+  ${colors.dim('# Git tag versioning')}
+  ${colors.accent('edgit tag create extraction-prompt v1.0.0')}    ${colors.dim('# Create version')}
+  ${colors.accent('edgit tag create extraction-prompt prod')}      ${colors.dim('# Create deployment tag')}
+  ${colors.accent('edgit tag list extraction-prompt')}             ${colors.dim('# List all tags')}
+
+  ${colors.dim('# Deployment workflows')}
+  ${colors.accent('edgit deploy set extraction-prompt v1.0.0 --to staging')}
+  ${colors.accent('edgit deploy promote extraction-prompt --from staging --to prod')}
+  ${colors.accent('edgit deploy status')}                          ${colors.dim('# Show all deployments')}
+
+  ${colors.dim('# Discovery')}
+  ${colors.accent('edgit discover scan --type prompt')}            ${colors.dim('# Find potential prompts')}
+  ${colors.accent('edgit commit')}                                 ${colors.dim('# AI-generated commit message')}
+
+${colors.bold('KEY CONCEPTS:')}
   • Components are minimal manifests (path + type) in .edgit/components.json
   • All versioning is handled by Git tags: components/<name>/<version>
   • Version tags (v1.0.0) are immutable, deployment tags (prod) can move
   • No merge conflicts - Git tags are the source of truth
   • AI-powered commit messages analyze component changes
 
-GIT PASSTHROUGH:
+${colors.bold('GIT PASSTHROUGH:')}
   All other commands are passed through to git unchanged.
   Examples: edgit branch, edgit log, edgit push, etc.
 `)
+  console.log(colors.dim('Docs:'), colors.underline('https://docs.ensemble.ai/edgit'))
 }
 
 /**
@@ -261,7 +264,8 @@ async function main(): Promise<void> {
 
       // Show workspace info if different from original cwd
       if (parsed.options.workspace) {
-        console.log(`📁 Working in: ${workspaceDir}\n`)
+        log.dim(`Working in: ${workspaceDir}`)
+        console.log('')
       }
     }
 
@@ -326,7 +330,7 @@ async function main(): Promise<void> {
         break
 
       case 'scan':
-        console.log('ℹ️  "edgit scan" moved to "edgit discover scan"')
+        log.info('"edgit scan" moved to "edgit discover scan"')
         const scanCmd = new DiscoverCommand()
         await scanCmd.execute(['scan', ...args])
         break
@@ -359,7 +363,7 @@ async function main(): Promise<void> {
         break
 
       case 'history':
-        console.log('ℹ️  "edgit history" moved to "edgit components show"')
+        log.info('"edgit history" moved to "edgit components show"')
         const historyComponentsCmd = new ComponentsCommand()
         await historyComponentsCmd.execute(['show', ...args])
         break
@@ -375,8 +379,9 @@ async function main(): Promise<void> {
         const gitStatus = new GitWrapper()
         await gitStatus.passthrough(['status', ...args])
 
-        console.log('\n🧩 Component Status:')
-        console.log('🚧 Component status tracking is not yet implemented.')
+        console.log('')
+        console.log(colors.primaryBold('🧩 Component Status:'))
+        log.warn('Component status tracking is not yet implemented.')
         break
 
       default:
@@ -390,6 +395,183 @@ async function main(): Promise<void> {
     const edgitErr = isEdgitError(error) ? error : EdgitError.from(error)
     console.error(edgitErr.toCliMessage())
     process.exit(1)
+  }
+}
+
+/**
+ * Core CLI logic without error handling (for programmatic use)
+ * Throws EdgitError on failures instead of calling process.exit
+ */
+async function runCore(): Promise<void> {
+  const parsed = parseArgs(process.argv)
+
+  // Handle global options first
+  if (parsed.options.version) {
+    await showVersion()
+    return
+  }
+
+  // Only show main help if no command specified, or if help requested for main command
+  if (!parsed.command || (parsed.options.help && !parsed.command)) {
+    showHelp()
+    return
+  }
+
+  // Set working directory if specified
+  let workspaceDir = parsed.workspace
+  if (parsed.command !== 'init' && parsed.command !== 'setup') {
+    workspaceDir = await validateWorkspace(workspaceDir || process.cwd())
+    process.chdir(workspaceDir)
+
+    // Show workspace info if different from original cwd
+    if (parsed.options.workspace) {
+      log.dim(`Working in: ${workspaceDir}`)
+      console.log('')
+    }
+  }
+
+  // Route commands to appropriate handlers
+  const command = parsed.command
+  const subcommand = parsed.subcommand
+  const args = parsed.args
+
+  switch (command) {
+    case 'init':
+    case 'setup':
+      await setupEdgit(args)
+      break
+
+    case 'commit':
+      await commitWithVersioning(args)
+      break
+
+    case 'components':
+    case 'component':
+      const componentsCmd = new ComponentsCommand()
+      const componentArgs = [subcommand, ...args].filter(Boolean) as string[]
+      if (parsed.options.help) {
+        componentArgs.push('--help')
+      }
+      await componentsCmd.execute(componentArgs)
+      break
+
+    case 'tag':
+      const tagCmd = new TagCommand()
+      const tagArgs = [subcommand, ...args].filter(Boolean) as string[]
+      if (parsed.options.help) {
+        tagArgs.push('--help')
+      }
+      await tagCmd.execute(tagArgs)
+      break
+
+    case 'deploy':
+      const deployCmd = new DeployCommand()
+      const deployArgs = [subcommand, ...args].filter(Boolean) as string[]
+      if (parsed.options.help) {
+        deployArgs.push('--help')
+      }
+      await deployCmd.execute(deployArgs)
+      break
+    case 'discover':
+      const discoverCmd = new DiscoverCommand()
+      const discoverArgs = [subcommand, ...args].filter(Boolean) as string[]
+      if (parsed.options.help) {
+        discoverArgs.push('--help')
+      }
+      await discoverCmd.execute(discoverArgs)
+      break
+
+    case 'detect':
+      const detectCmd = new DetectCommand()
+      const detectArgs = [...args]
+      if (parsed.options.help) {
+        detectArgs.push('--help')
+      }
+      await detectCmd.execute(detectArgs)
+      break
+
+    case 'scan':
+      log.info('"edgit scan" moved to "edgit discover scan"')
+      const scanCmd = new DiscoverCommand()
+      await scanCmd.execute(['scan', ...args])
+      break
+
+    case 'register':
+      const registerCmd = new RegisterCommand()
+      const registerArgs = [...args]
+      if (parsed.options.help) {
+        registerArgs.push('--help')
+      }
+      await registerCmd.execute(registerArgs)
+      break
+
+    case 'resync':
+      const resyncCmd = new ResyncCommand()
+      const resyncArgs = [...args]
+      if (parsed.options.help) {
+        resyncArgs.push('--help')
+      }
+      await resyncCmd.execute(resyncArgs)
+      break
+
+    case 'patterns':
+      const patternsCmd = new PatternsCommand()
+      const patternsArgs = [subcommand, ...args].filter(Boolean) as string[]
+      if (parsed.options.help) {
+        patternsArgs.push('--help')
+      }
+      await patternsCmd.execute(patternsArgs)
+      break
+
+    case 'history':
+      log.info('"edgit history" moved to "edgit components show"')
+      const historyComponentsCmd = new ComponentsCommand()
+      await historyComponentsCmd.execute(['show', ...args])
+      break
+
+    case 'checkout':
+      // Direct component checkout shortcut
+      const checkoutComponentsCmd = new ComponentsCommand()
+      await checkoutComponentsCmd.execute(['checkout', ...args])
+      break
+
+    case 'status':
+      // Git status with component information
+      const gitStatus = new GitWrapper()
+      await gitStatus.passthrough(['status', ...args])
+
+      console.log('')
+      console.log(colors.primaryBold('🧩 Component Status:'))
+      log.warn('Component status tracking is not yet implemented.')
+      break
+
+    default:
+      // Git passthrough for all unknown commands
+      const gitPassthrough = new GitWrapper()
+      await gitPassthrough.passthrough([command, ...args])
+      break
+  }
+}
+
+/**
+ * Export main for programmatic CLI access
+ * This allows the ensemble CLI to call edgit directly without subprocess spawning
+ */
+export { main }
+
+/**
+ * Run CLI with custom argv (for programmatic invocation)
+ * Unlike main(), this throws errors instead of calling process.exit()
+ * @param argv - Full argv array (typically starts with node path, script path, then args)
+ */
+export async function runCLI(argv: string[]): Promise<void> {
+  // Temporarily override process.argv
+  const originalArgv = process.argv
+  process.argv = argv
+  try {
+    await runCore()
+  } finally {
+    process.argv = originalArgv
   }
 }
 

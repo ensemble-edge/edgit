@@ -1,6 +1,7 @@
 import { GitWrapper } from '../utils/git.js'
 import type { ComponentDetector } from '../utils/component-detector.js'
 import * as path from 'path'
+import { log, colors } from '@ensemble-edge/ensemble/ui'
 
 /**
  * Base command handler for Edgit
@@ -120,12 +121,13 @@ export abstract class Command {
    * Show helpful error message with suggestions
    */
   protected showError(message: string, suggestions?: string[]): void {
-    console.error(`❌ ${message}`)
+    log.error(message)
 
     if (suggestions && suggestions.length > 0) {
-      console.error('\n💡 Suggestions:')
+      console.error('')
+      console.error(colors.accent('💡 Suggestions:'))
       suggestions.forEach((suggestion) => {
-        console.error(`   • ${suggestion}`)
+        console.error(`   ${colors.dim('•')} ${suggestion}`)
       })
     }
   }
@@ -134,21 +136,21 @@ export abstract class Command {
    * Show success message
    */
   protected showSuccess(message: string): void {
-    console.log(`✅ ${message}`)
+    log.success(message)
   }
 
   /**
    * Show info message
    */
   protected showInfo(message: string): void {
-    console.log(`ℹ️  ${message}`)
+    log.info(message)
   }
 
   /**
    * Show warning message
    */
   protected showWarning(message: string): void {
-    console.log(`⚠️  ${message}`)
+    log.warn(message)
   }
 
   /**
