@@ -5,7 +5,7 @@
  * enabling proper testing and error recovery.
  */
 
-import { statusIcons } from '@ensemble-edge/ensemble/ui'
+import { statusIcons } from '../utils/ui.js'
 
 /**
  * Error codes for categorizing Edgit errors
