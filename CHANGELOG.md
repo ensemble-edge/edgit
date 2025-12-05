@@ -1,5 +1,11 @@
 # @ensemble-edge/edgit
 
+## 0.4.2
+
+### Patch Changes
+
+- 09942c9: Documentation updates for unified Ensemble CLI installation approach
+
 ## 0.4.1
 
 ### Patch Changes
