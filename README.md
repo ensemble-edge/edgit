@@ -3,15 +3,14 @@
 *Every version of every component that ever existed is still there. Edgit just makes them visible.*
 
 ```bash
-# Recommended: Via unified Ensemble CLI
-pnpm add -g @ensemble-edge/ensemble
-ensemble edgit --help
+# Recommended: Via unified Ensemble CLI (no installation needed)
+npx @ensemble-edge/ensemble edgit --help
 
-# Alternative: Direct installation
-pnpm add -g @ensemble-edge/edgit
+# Or direct
+npx @ensemble-edge/edgit --help
 ```
 
-**Git tag-based component and agent versioning for AI systems.** The multiverse already exists in your Git history - every version of every component and agent lives in your commits. Edgit makes them accessible through native Git tags, eliminating merge conflicts while unlocking independent versioning for components and agents.
+**Git tag-based component and agent versioning for AI systems.** The multiverse already exists in your Git history—every version of every component and agent lives in your commits. Edgit makes them accessible through native Git tags, eliminating merge conflicts while unlocking independent versioning for components and agents. Deploy any combination to Cloudflare's edge in under 50ms globally.
 
 ## Novel Architecture: The Multiverse Made Visible
 
@@ -346,9 +345,8 @@ All protocols use the same URI format: `{protocol}://{path}[@{version}]`
 ## Quick Start
 
 ```bash
-npm install -g @ensemble-edge/edgit
 cd your-repo
-edgit init
+npx @ensemble-edge/edgit init
 ```
 
 **See the multiverse in action:**
