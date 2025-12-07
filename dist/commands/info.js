@@ -391,7 +391,7 @@ export class InfoCommand extends Command {
         console.log(colors.bold('Versions'));
         console.log(`  Total tags:       ${status.stats.totalVersions}`);
         if (status.recentVersions.length > 0) {
-            console.log(`  Recent:`);
+            console.log('  Recent:');
             for (const v of status.recentVersions.slice(0, 3)) {
                 const dateStr = v.date ? colors.dim(` (${v.date})`) : '';
                 console.log(`    ${v.component} ${colors.accent(v.version)}${dateStr}`);
