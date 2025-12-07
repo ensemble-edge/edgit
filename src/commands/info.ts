@@ -445,8 +445,12 @@ export class InfoCommand extends Command {
     // Project section
     console.log(colors.bold('Project'))
     console.log(`  Name:             ${colors.accent(status.projectName)}`)
-    console.log(`  Git repository:   ${status.gitRepo ? colors.success('Yes') : colors.error('No')}`)
-    console.log(`  Edgit initialized:${status.initialized ? colors.success('Yes') : colors.dim('No')}`)
+    console.log(
+      `  Git repository:   ${status.gitRepo ? colors.success('Yes') : colors.error('No')}`
+    )
+    console.log(
+      `  Edgit initialized:${status.initialized ? colors.success('Yes') : colors.dim('No')}`
+    )
     console.log('')
 
     if (!status.initialized) {
@@ -465,9 +469,12 @@ export class InfoCommand extends Command {
 
     if (status.componentsCount.total > 0) {
       const parts: string[] = []
-      if (status.componentsCount.prompts > 0) parts.push(`${status.componentsCount.prompts} prompts`)
-      if (status.componentsCount.schemas > 0) parts.push(`${status.componentsCount.schemas} schemas`)
-      if (status.componentsCount.configs > 0) parts.push(`${status.componentsCount.configs} configs`)
+      if (status.componentsCount.prompts > 0)
+        parts.push(`${status.componentsCount.prompts} prompts`)
+      if (status.componentsCount.schemas > 0)
+        parts.push(`${status.componentsCount.schemas} schemas`)
+      if (status.componentsCount.configs > 0)
+        parts.push(`${status.componentsCount.configs} configs`)
       if (status.componentsCount.agents > 0) parts.push(`${status.componentsCount.agents} agents`)
       if (status.componentsCount.ensembles > 0)
         parts.push(`${status.componentsCount.ensembles} ensembles`)
@@ -533,7 +540,8 @@ export class InfoCommand extends Command {
       if (status.stats.prodDeployments > 0 || status.stats.stagingDeployments > 0) {
         const parts: string[] = []
         if (status.stats.prodDeployments > 0) parts.push(`${status.stats.prodDeployments} prod`)
-        if (status.stats.stagingDeployments > 0) parts.push(`${status.stats.stagingDeployments} staging`)
+        if (status.stats.stagingDeployments > 0)
+          parts.push(`${status.stats.stagingDeployments} staging`)
         console.log(`Deployments: ${parts.join(' | ')}`)
       }
       if (status.untrackedCount > 0) {
