@@ -28,7 +28,21 @@ npm run format
 
 **Note**: If Prettier is not yet configured, skip this step (but add it to the TODO list).
 
-### Step 1: Sync with Remote (CRITICAL - DO THIS AFTER FORMATTING!)
+### Step 0b: Run Tests (CRITICAL - DO THIS BEFORE PUSHING!)
+```bash
+cd /workspace/ensemble/edgit
+npm test
+```
+
+**Why**:
+- CI/CD will fail if tests don't pass
+- Catches bugs locally BEFORE pushing to remote
+- Saves time by avoiding failed GitHub Actions runs
+- **NEVER skip this step** - always run tests before creating changeset
+
+**If tests fail**: Fix the failing tests before proceeding. Do NOT push code with failing tests.
+
+### Step 1: Sync with Remote (CRITICAL - DO THIS AFTER TESTS PASS!)
 ```bash
 cd /workspace/ensemble/edgit
 git pull origin master
@@ -157,6 +171,7 @@ Do you still want patch, or should I use minor?
 ✅ **Automatic cleanup** - Changesets deleted on merge
 
 ## Never Do These:
+- ❌ **DO NOT push without running tests first** - always `npm test` before push
 - ❌ **DO NOT manually edit package.json or CHANGELOG.md**
 - ❌ **DO NOT manually create or delete tags**
 - ❌ **DO NOT merge Version Packages PR if tests are failing**
