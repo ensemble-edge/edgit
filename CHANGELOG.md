@@ -1,5 +1,15 @@
 # @ensemble-edge/edgit
 
+## 0.4.4
+
+### Patch Changes
+
+- 197d540: Add `edgit info` command for comprehensive project status display
+  - Shows repository state, component counts, recent versions
+  - Displays deployment status for tracked components
+  - Supports `--json` and `--compact` output formats for CI/scripting
+  - `edgit status` now passes through to `git status` (git-native behavior)
+
 ## 0.4.3
 
 ### Patch Changes
