@@ -24,6 +24,7 @@ import { ScanCommand } from './commands/scan.js'
 import { PatternsCommand } from './commands/patterns.js'
 import { HistoryCommand } from './commands/history.js'
 import { RegisterCommand } from './commands/register.js'
+import { InfoCommand } from './commands/info.js'
 import { EdgitError, isEdgitError } from './errors/index.js'
 import process from 'process'
 import path from 'path'
@@ -374,14 +375,20 @@ async function main(): Promise<void> {
         await checkoutComponentsCmd.execute(['checkout', ...args])
         break
 
+      case 'info':
+        // Edgit project info (authoritative source for ensemble CLI)
+        const infoCmd = new InfoCommand()
+        const infoArgs = [...args]
+        if (parsed.options.help) {
+          infoArgs.push('--help')
+        }
+        await infoCmd.execute(infoArgs)
+        break
+
       case 'status':
-        // Git status with component information
+        // Git status passthrough (keeps git status behavior)
         const gitStatus = new GitWrapper()
         await gitStatus.passthrough(['status', ...args])
-
-        console.log('')
-        console.log(colors.primaryBold('🧩 Component Status:'))
-        log.warn('Component status tracking is not yet implemented.')
         break
 
       default:
