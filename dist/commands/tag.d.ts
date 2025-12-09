@@ -30,6 +30,20 @@ export declare class TagCommand extends Command {
     private listAllComponentTags;
     private getComponentTagData;
     private listComponentTags;
+    /**
+     * Bump version tag for a component
+     * Finds latest version and increments based on bump type
+     */
+    private bumpTag;
+    /**
+     * Bump a semver version string
+     */
+    private bumpVersion;
+    /**
+     * Compare two semver versions
+     * Returns negative if a < b, positive if a > b, 0 if equal
+     */
+    private compareSemver;
     private loadRegistry;
     getHelp(): string;
     private showHelp;

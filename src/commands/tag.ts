@@ -79,6 +79,9 @@ export class TagCommand extends Command {
       case 'delete':
         await this.deleteTag(args.slice(1))
         break
+      case 'bump':
+        await this.bumpTag(args.slice(1))
+        break
       case 'push':
         console.warn('⚠️  Deprecated: Use "edgit push --tags" instead')
         break
@@ -500,6 +503,174 @@ export class TagCommand extends Command {
     }
   }
 
+  /**
+   * Bump version tag for a component
+   * Finds latest version and increments based on bump type
+   */
+  private async bumpTag(args: string[]): Promise<void> {
+    if (args.length < 2) {
+      throw new EdgitError(
+        'VALIDATION_ERROR',
+        'Usage: edgit tag bump <component> <major|minor|patch|prerelease> [--ref <ref>]'
+      )
+    }
+
+    const componentName = args[0]!
+    const bumpType = args[1]!
+
+    // Extract --ref option
+    const refIndex = args.indexOf('--ref')
+    const ref = refIndex !== -1 && args[refIndex + 1] ? args[refIndex + 1]! : 'HEAD'
+
+    // Validate bump type
+    const validBumpTypes = ['major', 'minor', 'patch', 'prerelease'] as const
+    if (!validBumpTypes.includes(bumpType as (typeof validBumpTypes)[number])) {
+      throw new EdgitError(
+        'VALIDATION_ERROR',
+        `Invalid bump type: ${bumpType}\nUse: ${validBumpTypes.join(', ')}`
+      )
+    }
+
+    const registry = await this.loadRegistry()
+    const component = ComponentUtils.findComponentByName(registry, componentName)
+
+    if (!component) {
+      const available = ComponentUtils.listComponentNames(registry).join(', ')
+      throw new EdgitError(
+        'COMPONENT_NOT_FOUND',
+        `Component '${componentName}' not found.\nAvailable: ${available || '(none)'}`
+      )
+    }
+
+    const entityType = componentTypeToEntityType(component.type)
+    const prefix = inferPrefixFromPath(component.path)
+
+    // Get all version tags for this component
+    const allTags = await this.tagManager.listTags(prefix, entityType, componentName)
+    const versionTags = allTags
+      .filter((t) => t.slotType === 'version')
+      .map((t) => t.slot)
+      .sort(this.compareSemver)
+
+    if (versionTags.length === 0) {
+      throw new EdgitError(
+        'TAG_NOT_FOUND',
+        `No versions found for ${componentName}.\nUse 'edgit tag create ${componentName} v1.0.0' for first version.`
+      )
+    }
+
+    const latestVersion = versionTags[versionTags.length - 1]!
+    const newVersion = this.bumpVersion(latestVersion, bumpType as (typeof validBumpTypes)[number])
+
+    try {
+      const gitTag = await this.tagManager.createVersionTag(
+        prefix,
+        entityType,
+        componentName,
+        newVersion,
+        ref,
+        `Bump ${componentName} ${bumpType}: ${latestVersion} → ${newVersion}`
+      )
+
+      const sha = await this.tagManager.resolveRefToSHA(ref)
+
+      console.log(`Latest version: ${latestVersion}`)
+      console.log(`Bumping: ${bumpType}`)
+      console.log('')
+      console.log(`✅ Created tag: ${componentName}@${newVersion}`)
+      console.log(`   Git tag: ${gitTag}`)
+      console.log(`   Points to: ${sha.slice(0, 7)}`)
+      console.log('')
+      console.log('Push to deploy:')
+      console.log('  edgit push --tags')
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('already exists')) {
+        throw new EdgitError(
+          'TAG_EXISTS',
+          `Version tag ${newVersion} already exists. Version tags are immutable.`
+        )
+      }
+      throw EdgitError.from(error, 'GIT_ERROR')
+    }
+  }
+
+  /**
+   * Bump a semver version string
+   */
+  private bumpVersion(
+    version: string,
+    bumpType: 'major' | 'minor' | 'patch' | 'prerelease'
+  ): string {
+    // Remove 'v' prefix for parsing
+    const v = version.startsWith('v') ? version.slice(1) : version
+    const parts = v.split('-')
+    const mainPart = parts[0]!
+    const prerelease = parts[1]
+
+    const [majorStr, minorStr, patchStr] = mainPart.split('.')
+    const major = parseInt(majorStr || '0', 10)
+    const minor = parseInt(minorStr || '0', 10)
+    const patch = parseInt(patchStr || '0', 10)
+
+    switch (bumpType) {
+      case 'major':
+        return `v${major + 1}.0.0`
+      case 'minor':
+        return `v${major}.${minor + 1}.0`
+      case 'patch':
+        // If currently prerelease, just drop the prerelease
+        if (prerelease) {
+          return `v${major}.${minor}.${patch}`
+        }
+        return `v${major}.${minor}.${patch + 1}`
+      case 'prerelease':
+        if (prerelease) {
+          // Increment prerelease: v1.2.3-beta.0 → v1.2.3-beta.1
+          const preParts = prerelease.split('.')
+          const preNum = parseInt(preParts[preParts.length - 1] || '0', 10)
+          if (!isNaN(preNum)) {
+            preParts[preParts.length - 1] = String(preNum + 1)
+            return `v${major}.${minor}.${patch}-${preParts.join('.')}`
+          }
+          return `v${major}.${minor}.${patch}-${prerelease}.1`
+        }
+        // New prerelease: v1.2.3 → v1.2.4-0
+        return `v${major}.${minor}.${patch + 1}-0`
+      default:
+        throw new EdgitError('VALIDATION_ERROR', `Unknown bump type: ${bumpType}`)
+    }
+  }
+
+  /**
+   * Compare two semver versions
+   * Returns negative if a < b, positive if a > b, 0 if equal
+   */
+  private compareSemver(a: string, b: string): number {
+    const parseVer = (v: string) => {
+      const clean = v.startsWith('v') ? v.slice(1) : v
+      const [main, pre] = clean.split('-')
+      const [majorStr, minorStr, patchStr] = (main || '0.0.0').split('.')
+      return {
+        major: parseInt(majorStr || '0', 10),
+        minor: parseInt(minorStr || '0', 10),
+        patch: parseInt(patchStr || '0', 10),
+        pre: pre || '',
+      }
+    }
+
+    const av = parseVer(a)
+    const bv = parseVer(b)
+
+    if (av.major !== bv.major) return av.major - bv.major
+    if (av.minor !== bv.minor) return av.minor - bv.minor
+    if (av.patch !== bv.patch) return av.patch - bv.patch
+
+    // Prerelease sorts before release (v1.0.0-beta < v1.0.0)
+    if (av.pre && !bv.pre) return -1
+    if (!av.pre && bv.pre) return 1
+    return av.pre.localeCompare(bv.pre)
+  }
+
   private async loadRegistry(): Promise<ComponentRegistry> {
     const registryPath = path.join(process.cwd(), '.edgit', 'components.json')
     try {
@@ -516,6 +687,7 @@ edgit tag - Manage component version and environment tags
 
 USAGE:
   edgit tag create <component> <version> [ref]    Create immutable version tag
+  edgit tag bump <component> <level> [--ref ref]  Bump version (major|minor|patch|prerelease)
   edgit tag set <component> <env> [ref]           Create/move environment tag
   edgit tag list [component] [--format json]      List tags for component(s)
   edgit tag show <component>@<tag>                Show detailed tag information
@@ -529,8 +701,15 @@ TAG FORMAT (4-level hierarchy):
   name:    component name
   slot:    version (v1.0.0) or environment (staging, production)
 
+BUMP TYPES:
+  major      v1.2.3 → v2.0.0
+  minor      v1.2.3 → v1.3.0
+  patch      v1.2.3 → v1.2.4
+  prerelease v1.2.3 → v1.2.4-0, v1.2.4-0 → v1.2.4-1
+
 EXAMPLES:
   edgit tag create extraction v1.0.0
+  edgit tag bump extraction patch
   edgit tag set extraction staging v1.0.0
   edgit tag list
   edgit tag show extraction@v1.0.0
