@@ -1,9 +1,13 @@
 import type { GitWrapper } from './git.js';
 import type { Result } from '../types/result.js';
 /**
+ * Tag prefix - determines what happens on push
+ * - components: Syncs to KV (hot-swappable)
+ * - logic: Triggers Worker rebuild
+ */
+export type TagPrefix = 'components' | 'logic';
+/**
  * Entity types that can be versioned
- * Aligned with Conductor's ComponentType for seamless integration
- *
  * Each type gets its own namespace (pluralized):
  * - agent → agents/
  * - prompt → prompts/
@@ -14,173 +18,137 @@ import type { Result } from '../types/result.js';
  * - script → scripts/
  * - ensemble → ensembles/
  * - tool → tools/
- *
- * Legacy 'component' type is still supported for backwards compatibility
- * and maps to 'components/' namespace.
+ * - route → routes/
  */
-export type EntityType = 'agent' | 'prompt' | 'schema' | 'template' | 'query' | 'config' | 'script' | 'ensemble' | 'tool' | 'agent-definition' | 'component';
+export type EntityType = 'agent' | 'prompt' | 'schema' | 'template' | 'query' | 'config' | 'script' | 'ensemble' | 'tool' | 'route';
 /**
- * Git Tag Manager for Edgit component and agent versioning and deployment
- * Handles namespaced tags with separation between version and deployment tags
- * Uses type-specific namespaces (prompts/, schemas/, templates/, etc.)
+ * Slot type - determines mutability
+ * - version: Immutable, semver format (v1.0.0)
+ * - environment: Mutable, can be moved (main, staging, production)
+ */
+export type SlotType = 'version' | 'environment';
+/**
+ * Parsed tag information
+ */
+export interface ParsedTag {
+    prefix: TagPrefix;
+    type: string;
+    name: string;
+    slot: string;
+    slotType: SlotType;
+    fullTag: string;
+}
+/**
+ * Tag information with git metadata
+ */
+export interface TagInfo {
+    tag: string;
+    sha: string;
+    date: string;
+    message: string;
+    author: string;
+}
+/**
+ * Extended tag info including parsed components
+ */
+export interface ExtendedTagInfo extends TagInfo, ParsedTag {
+}
+/**
+ * Git Tag Manager for Edgit component versioning
+ *
+ * Implements the 4-level tag hierarchy:
+ *   {prefix}/{type}/{name}/{slot}
+ *
+ * Where:
+ * - prefix: 'components' or 'logic'
+ * - type: prompts, agents, schemas, ensembles, etc.
+ * - name: component name (e.g., extraction, classifier)
+ * - slot: version (v1.0.0) or environment (main, staging, production)
+ *
+ * Philosophy: Edgit is a thin git wrapper. It creates and manages git tags.
+ * It doesn't deploy, doesn't sync to KV, doesn't communicate with Cloudflare.
+ * GitHub Actions handles everything after `git push`.
  */
 export declare class GitTagManager {
     private git;
     constructor(git: GitWrapper);
     /**
-     * Get namespace prefix for entity type
-     * Pluralizes the type name to create the namespace
-     *
-     * Examples:
-     * - 'agent' → 'agents'
-     * - 'prompt' → 'prompts'
-     * - 'schema' → 'schemas'
-     * - 'query' → 'queries' (special case)
-     * - 'component' → 'components' (legacy)
+     * Get namespace (pluralized type name) for entity type
      */
-    private getNamespace;
+    getNamespace(entityType: EntityType): string;
     /**
-     * Create a namespaced tag for component or agent
-     * @param name Entity name (component or agent name)
-     * @param tagName Tag name (e.g., 'v1.0.0', 'prod', 'staging')
-     * @param entityType Entity type ('component' or 'agent')
-     * @param sha Optional SHA to tag (defaults to HEAD)
-     * @param message Optional tag message
+     * Check if a slot is a version (semver format)
      */
-    tag(name: string, tagName: string, entityType?: EntityType, sha?: string, message?: string): Promise<string>;
+    isVersionSlot(slot: string): boolean;
     /**
-     * Create a namespaced component tag (backward compatible)
-     * @deprecated Use tag() with specific entityType (prompt, schema, template, etc.) instead
+     * Check if a slot is an environment (not a version)
      */
-    tagComponent(component: string, tagName: string, sha?: string, message?: string): Promise<string>;
+    isEnvironmentSlot(slot: string): boolean;
     /**
-     * Create a namespaced agent tag
-     * @param agent Agent name
-     * @param tagName Tag name (e.g., 'v1.0.0', 'prod', 'staging')
-     * @param sha Optional SHA to tag (defaults to HEAD)
-     * @param message Optional tag message
+     * Get slot type from slot string
      */
-    tagAgent(agent: string, tagName: string, sha?: string, message?: string): Promise<string>;
+    getSlotType(slot: string): SlotType;
     /**
-     * List all tags for a specific entity
-     * @param name Entity name
-     * @param entityType Entity type ('component' or 'agent')
-     * @returns Array of tag names (without namespace prefix)
+     * Build a 4-level tag path
+     * Format: {prefix}/{type}/{name}/{slot}
      */
-    listTags(name: string, entityType?: EntityType): Promise<string[]>;
+    buildTagPath(prefix: TagPrefix, entityType: EntityType, name: string, slot: string): string;
     /**
-     * List all tags for a specific component (backward compatible)
-     * @deprecated Use listTags() with entityType parameter instead
+     * Parse a 4-level tag path
+     * Returns null if format is invalid
      */
-    listComponentTags(component: string): Promise<string[]>;
-    /**
-     * List all tags for a specific agent
-     * @param agent Agent name
-     * @returns Array of tag names (without namespace prefix)
-     */
-    listAgentTags(agent: string): Promise<string[]>;
-    /**
-     * Get the SHA that a tag points to
-     * @param name Entity name
-     * @param tagName Tag name
-     * @param entityType Entity type ('component' or 'agent')
-     * @returns SHA hash
-     */
-    getTagSHA(name: string, tagName: string, entityType?: EntityType): Promise<string>;
-    /**
-     * Check if a tag exists
-     * @param name Entity name
-     * @param tagName Tag name
-     * @param entityType Entity type ('component' or 'agent')
-     * @returns True if tag exists
-     */
-    tagExists(name: string, tagName: string, entityType?: EntityType): Promise<boolean>;
-    /**
-     * Move a deployment tag to a new target (with force)
-     * Used for deployment tags like 'prod', 'staging' that can move
-     * @param name Entity name
-     * @param env Environment name (prod, staging, etc.)
-     * @param targetRef Target SHA, tag, or ref
-     * @param entityType Entity type ('component' or 'agent')
-     * @param message Optional tag message
-     */
-    moveDeploymentTag(name: string, env: string, targetRef: string, entityType?: EntityType, message?: string): Promise<string>;
+    parseTagPath(tag: string): ParsedTag | null;
     /**
      * Create an immutable version tag
-     * Version tags cannot be overwritten (no force flag)
-     * @param name Entity name
-     * @param version Version string (e.g., 'v1.0.0')
-     * @param entityType Entity type ('component' or 'agent')
-     * @param sha Optional SHA to tag (defaults to HEAD)
-     * @param message Optional tag message
+     * Version tags cannot be overwritten
      */
-    createVersionTag(name: string, version: string, entityType?: EntityType, sha?: string, message?: string): Promise<string>;
+    createVersionTag(prefix: TagPrefix, entityType: EntityType, name: string, version: string, sha?: string, message?: string): Promise<string>;
     /**
-     * Resolve a reference to a SHA
-     * Handles SHAs, tags, version tags, deployment tags
-     * @param name Entity name
-     * @param ref Reference string (SHA, tag name, etc.)
-     * @param entityType Entity type ('component' or 'agent')
-     * @returns SHA hash
+     * Create or move an environment tag
+     * Environment tags are mutable and can be moved with force
      */
-    resolveRef(name: string, ref: string, entityType?: EntityType): Promise<string>;
+    setEnvironmentTag(prefix: TagPrefix, entityType: EntityType, name: string, env: string, targetRef?: string, message?: string): Promise<string>;
     /**
-     * Get detailed tag information
-     * @param name Entity name
-     * @param tagName Tag name
-     * @param entityType Entity type ('component' or 'agent')
-     * @returns Tag details with SHA, date, message, author
+     * Delete a tag (local only)
      */
-    getTagInfo(name: string, tagName: string, entityType?: EntityType): Promise<{
-        tag: string;
-        sha: string;
-        date: string;
-        message: string;
-        author: string;
-    }>;
+    deleteTag(prefix: TagPrefix, entityType: EntityType, name: string, slot: string): Promise<void>;
     /**
-     * Get all version tags (sorted by semantic version)
-     * @param name Entity name
-     * @param entityType Entity type ('component' or 'agent')
-     * @returns Array of version tag names sorted by version
+     * List all tags matching the 4-level pattern
      */
-    getVersionTags(name: string, entityType?: EntityType): Promise<string[]>;
+    listTags(prefix?: TagPrefix, entityType?: EntityType, name?: string): Promise<ExtendedTagInfo[]>;
     /**
-     * Get all deployment tags
-     * @param name Entity name
-     * @param entityType Entity type ('component' or 'agent')
-     * @returns Array of deployment tag names
+     * Get tag info by full path
      */
-    getDeploymentTags(name: string, entityType?: EntityType): Promise<string[]>;
+    getTagInfo(gitTag: string): Promise<TagInfo>;
     /**
-     * Push tags to remote
-     * @param name Entity name
-     * @param entityType Entity type ('component' or 'agent')
-     * @param tagNames Optional specific tags to push (defaults to all)
-     * @param force Whether to force push (for deployment tags)
+     * Check if a tag exists by full path
      */
-    pushTags(name: string, entityType?: EntityType, tagNames?: string[], force?: boolean): Promise<void>;
+    tagExistsByPath(gitTag: string): Promise<boolean>;
     /**
-     * Delete a tag
-     * @param name Entity name
-     * @param tagName Tag name to delete
-     * @param entityType Entity type ('component' or 'agent')
-     * @param deleteRemote Whether to also delete from remote
+     * Check if a tag exists
      */
-    deleteTag(name: string, tagName: string, entityType?: EntityType, deleteRemote?: boolean): Promise<void>;
+    tagExists(prefix: TagPrefix, entityType: EntityType, name: string, slot: string): Promise<boolean>;
+    /**
+     * Resolve any ref (SHA, tag, branch) to a SHA
+     */
+    resolveRefToSHA(ref: string): Promise<string>;
+    /**
+     * Get SHA that a tag points to
+     */
+    getTagSHA(prefix: TagPrefix, entityType: EntityType, name: string, slot: string): Promise<string>;
     /**
      * Get file content at a specific tag
-     * @param name Entity name
-     * @param tagName Tag name
-     * @param filePath File path within the repository
-     * @param entityType Entity type ('component' or 'agent')
-     * @returns File content as string
      */
-    getFileAtTag(name: string, tagName: string, filePath: string, entityType?: EntityType): Promise<string>;
+    getFileAtTag(prefix: TagPrefix, entityType: EntityType, name: string, slot: string, filePath: string): Promise<string>;
+    /**
+     * Get all version tags for a component (sorted by semver)
+     */
+    getVersionTags(prefix: TagPrefix, entityType: EntityType, name: string): Promise<ExtendedTagInfo[]>;
+    /**
+     * Get all environment tags for a component
+     */
+    getEnvironmentTags(prefix: TagPrefix, entityType: EntityType, name: string): Promise<ExtendedTagInfo[]>;
 }
-/**
- * Git tag error types for Result-based API
- */
 export type GitTagError = {
     kind: 'tag_exists';
     tag: string;
@@ -198,76 +166,37 @@ export type GitTagError = {
     ref: string;
     message: string;
 } | {
+    kind: 'invalid_version';
+    version: string;
+    message: string;
+} | {
     kind: 'file_not_found';
     path: string;
     tag: string;
     message: string;
 };
-/**
- * Tag information returned by Result-based methods
- */
-export interface TagInfo {
-    tag: string;
-    sha: string;
-    date: string;
-    message: string;
-    author: string;
-}
-/**
- * Result-based GitTagManager methods
- * These provide explicit error handling without throwing exceptions
- */
 export declare class GitTagManagerResult {
     private manager;
     constructor(git: GitWrapper);
-    /**
-     * Create a tag with Result-based error handling
-     */
-    createTag(name: string, tagName: string, entityType?: EntityType, sha?: string, message?: string): Promise<Result<string, GitTagError>>;
-    /**
-     * Create an immutable version tag with Result-based error handling
-     */
-    createVersionTag(name: string, version: string, entityType?: EntityType, sha?: string, message?: string): Promise<Result<string, GitTagError>>;
-    /**
-     * Get tag SHA with Result-based error handling
-     */
-    getTagSHA(name: string, tagName: string, entityType?: EntityType): Promise<Result<string, GitTagError>>;
-    /**
-     * Get tag info with Result-based error handling
-     */
-    getTagInfo(name: string, tagName: string, entityType?: EntityType): Promise<Result<TagInfo, GitTagError>>;
-    /**
-     * Resolve a reference with Result-based error handling
-     */
-    resolveRef(name: string, ref: string, entityType?: EntityType): Promise<Result<string, GitTagError>>;
-    /**
-     * Get file content at tag with Result-based error handling
-     */
-    getFileAtTag(name: string, tagName: string, filePath: string, entityType?: EntityType): Promise<Result<string, GitTagError>>;
-    /**
-     * Move deployment tag with Result-based error handling
-     */
-    moveDeploymentTag(name: string, env: string, targetRef: string, entityType?: EntityType, message?: string): Promise<Result<string, GitTagError>>;
-    /**
-     * Delete a tag with Result-based error handling
-     */
-    deleteTag(name: string, tagName: string, entityType?: EntityType, deleteRemote?: boolean): Promise<Result<void, GitTagError>>;
-    /**
-     * Access the underlying manager for non-Result methods
-     */
+    createVersionTag(prefix: TagPrefix, entityType: EntityType, name: string, version: string, sha?: string, message?: string): Promise<Result<string, GitTagError>>;
+    setEnvironmentTag(prefix: TagPrefix, entityType: EntityType, name: string, env: string, targetRef?: string, message?: string): Promise<Result<string, GitTagError>>;
+    deleteTag(prefix: TagPrefix, entityType: EntityType, name: string, slot: string): Promise<Result<void, GitTagError>>;
+    getTagSHA(prefix: TagPrefix, entityType: EntityType, name: string, slot: string): Promise<Result<string, GitTagError>>;
+    getTagInfo(gitTag: string): Promise<Result<TagInfo, GitTagError>>;
+    resolveRefToSHA(ref: string): Promise<Result<string, GitTagError>>;
+    getFileAtTag(prefix: TagPrefix, entityType: EntityType, name: string, slot: string, filePath: string): Promise<Result<string, GitTagError>>;
     get underlying(): GitTagManager;
-    listTags: (name: string, entityType?: EntityType) => Promise<string[]>;
-    tagExists: (name: string, tagName: string, entityType?: EntityType) => Promise<boolean>;
-    getVersionTags: (name: string, entityType?: EntityType) => Promise<string[]>;
-    getDeploymentTags: (name: string, entityType?: EntityType) => Promise<string[]>;
-    pushTags: (name: string, entityType?: EntityType, tagNames?: string[], force?: boolean) => Promise<void>;
+    listTags: (prefix?: TagPrefix, entityType?: EntityType, name?: string) => Promise<ExtendedTagInfo[]>;
+    tagExists: (prefix: TagPrefix, entityType: EntityType, name: string, slot: string) => Promise<boolean>;
+    getVersionTags: (prefix: TagPrefix, entityType: EntityType, name: string) => Promise<ExtendedTagInfo[]>;
+    getEnvironmentTags: (prefix: TagPrefix, entityType: EntityType, name: string) => Promise<ExtendedTagInfo[]>;
+    isVersionSlot: (slot: string) => boolean;
+    isEnvironmentSlot: (slot: string) => boolean;
+    getSlotType: (slot: string) => SlotType;
+    buildTagPath: (prefix: TagPrefix, entityType: EntityType, name: string, slot: string) => string;
+    parseTagPath: (tag: string) => ParsedTag | null;
+    getNamespace: (entityType: EntityType) => string;
 }
-/**
- * Convenience function to create GitTagManager instance
- */
 export declare function createGitTagManager(git: GitWrapper): GitTagManager;
-/**
- * Create a Result-based GitTagManager for explicit error handling
- */
 export declare function createGitTagManagerWithResult(git: GitWrapper): GitTagManagerResult;
 //# sourceMappingURL=git-tags.d.ts.map

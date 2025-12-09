@@ -33,12 +33,12 @@ export declare const componentTypeSchema: z.ZodEnum<{
  * Deployment environment names
  */
 export declare const deploymentEnvSchema: z.ZodEnum<{
+    test: "test";
     prod: "prod";
     staging: "staging";
+    dev: "dev";
     canary: "canary";
     latest: "latest";
-    dev: "dev";
-    test: "test";
 }>;
 /**
  * Git SHA (short or full)
@@ -59,12 +59,12 @@ export declare const filePathSchema: z.ZodString;
 export declare const tagCreateArgsSchema: z.ZodObject<{
     component: z.ZodString;
     tagName: z.ZodUnion<readonly [z.ZodString, z.ZodEnum<{
+        test: "test";
         prod: "prod";
         staging: "staging";
+        dev: "dev";
         canary: "canary";
         latest: "latest";
-        dev: "dev";
-        test: "test";
     }>, z.ZodString]>;
     sha: z.ZodOptional<z.ZodString>;
     message: z.ZodOptional<z.ZodString>;
@@ -84,12 +84,12 @@ export declare const deployArgsSchema: z.ZodObject<{
     component: z.ZodString;
     version: z.ZodUnion<readonly [z.ZodString, z.ZodString]>;
     environment: z.ZodEnum<{
+        test: "test";
         prod: "prod";
         staging: "staging";
+        dev: "dev";
         canary: "canary";
         latest: "latest";
-        dev: "dev";
-        test: "test";
     }>;
     force: z.ZodDefault<z.ZodBoolean>;
 }, z.core.$strip>;

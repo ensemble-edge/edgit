@@ -284,8 +284,10 @@ export class CommitCommand extends Command {
     }
 
     console.log('\n💡 Git tag-based versioning:')
-    console.log('   Create version tags: edgit tag <component> v1.0.0')
-    console.log('   Deploy to environment: edgit deploy <component> v1.0.0 --to prod')
+    console.log('   Create version tags: edgit tag create <component> v1.0.0')
+    console.log(
+      '   Deploy to environment: edgit tag set <component> <env> v1.0.0 && edgit push --tags --force'
+    )
     console.log('   View component history: edgit components show <component>')
   }
 
@@ -362,10 +364,11 @@ AI-POWERED COMMIT MESSAGES:
 
 GIT TAG-BASED VERSIONING:
   Instead of automatic version bumping, use explicit Git tags:
-  
-  edgit tag <component> v1.0.0           # Create version tag
-  edgit deploy <component> v1.0.0 --to prod # Deploy to environment
-  edgit components show <component>      # View all versions
+
+  edgit tag create <component> v1.0.0     # Create version tag
+  edgit tag set <component> <env> v1.0.0  # Set environment tag
+  edgit push --tags --force               # Push to deploy
+  edgit components show <component>       # View all versions
 
 EXAMPLES:
   edgit commit -m "fix: update extraction prompt"   # Manual message
@@ -381,7 +384,7 @@ WORKFLOW:
 
 NOTE:
   This replaces automatic version bumping with explicit Git tag management.
-  Use edgit tag and edgit deploy for version control and deployments.
+  Use "edgit tag create" and "edgit tag set" for versioning, then "edgit push --tags --force" to deploy.
 `
   }
 }

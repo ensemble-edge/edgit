@@ -17,6 +17,16 @@ function componentTypeToEntityType(componentType) {
     return componentType;
 }
 /**
+ * Infer prefix from file path
+ */
+function inferPrefixFromPath(filePath) {
+    const normalized = filePath.replace(/\\/g, '/');
+    if (normalized.startsWith('src/logic/') || normalized.includes('/src/logic/') || normalized.startsWith('logic/')) {
+        return 'logic';
+    }
+    return 'components';
+}
+/**
  * Deploy command for managing component deployments using Git tags
  * Moves deployment tags between environments and promotes components
  */
@@ -76,17 +86,20 @@ export class DeployCommand extends Command {
             const available = ComponentUtils.listComponentNames(registry).join(', ');
             throw new EdgitError('COMPONENT_NOT_FOUND', `Component '${componentName}' not found. Available: ${available}`);
         }
-        // Get the entity type from the component's actual type for type-specific namespaces
+        // Get the entity type and prefix from the component
         const entityType = componentTypeToEntityType(component.type);
+        const prefix = inferPrefixFromPath(component.path);
         try {
-            // Resolve version to SHA
-            const sha = await this.tagManager.resolveRef(componentName, version, entityType);
-            // Move deployment tag to this SHA
-            const gitTag = await this.tagManager.moveDeploymentTag(componentName, environment, sha, entityType, `Deploy ${componentName}@${version} to ${environment}`);
+            // Build the full git tag path for the version
+            const versionTagPath = this.tagManager.buildTagPath(prefix, entityType, componentName, version);
+            // Resolve version tag to SHA
+            const sha = await this.tagManager.resolveRefToSHA(versionTagPath);
+            // Set environment tag to this SHA
+            const gitTag = await this.tagManager.setEnvironmentTag(prefix, entityType, componentName, environment, sha, `Deploy ${componentName}@${version} to ${environment}`);
             console.log(`✅ Deployed ${componentName}@${version} to ${environment}`);
             console.log(`   Git tag: ${gitTag} → ${sha.substring(0, 8)}`);
             // Show what's now deployed with the specific version that was deployed
-            await this.showSpecificDeployment(componentName, environment, version, sha, entityType);
+            await this.showSpecificDeployment(componentName, environment, version, sha, entityType, prefix);
             console.log(`\n💡 Push with: git push origin ${gitTag} --force`);
         }
         catch (error) {
@@ -120,19 +133,20 @@ export class DeployCommand extends Command {
             const available = ComponentUtils.listComponentNames(registry).join(', ');
             throw new EdgitError('COMPONENT_NOT_FOUND', `Component '${componentName}' not found. Available: ${available}`);
         }
-        // Get the entity type from the component's actual type for type-specific namespaces
+        // Get the entity type and prefix from the component
         const entityType = componentTypeToEntityType(component.type);
+        const prefix = inferPrefixFromPath(component.path);
         try {
             // Get SHA from source environment
-            const fromSHA = await this.tagManager.getTagSHA(componentName, fromEnv, entityType);
+            const fromSHA = await this.tagManager.getTagSHA(prefix, entityType, componentName, fromEnv);
             // Get version info for the SHA (find which version tag points to this SHA)
-            const versionTags = await this.tagManager.getVersionTags(componentName, entityType);
+            const versionTags = await this.tagManager.getVersionTags(prefix, entityType, componentName);
             let versionInfo = 'unknown';
             for (const versionTag of versionTags) {
                 try {
-                    const versionSHA = await this.tagManager.getTagSHA(componentName, versionTag, entityType);
+                    const versionSHA = await this.tagManager.getTagSHA(prefix, entityType, componentName, versionTag.slot);
                     if (versionSHA === fromSHA) {
-                        versionInfo = versionTag;
+                        versionInfo = versionTag.slot;
                         break;
                     }
                 }
@@ -140,14 +154,14 @@ export class DeployCommand extends Command {
                     // Continue searching
                 }
             }
-            // Move target environment tag to same SHA
-            const gitTag = await this.tagManager.moveDeploymentTag(componentName, toEnv, fromSHA, entityType, `Promote ${componentName} from ${fromEnv} to ${toEnv}`);
+            // Set target environment tag to same SHA
+            const gitTag = await this.tagManager.setEnvironmentTag(prefix, entityType, componentName, toEnv, fromSHA, `Promote ${componentName} from ${fromEnv} to ${toEnv}`);
             console.log(`✅ Promoted ${componentName} from ${fromEnv} to ${toEnv}`);
             console.log(`   Version: ${versionInfo}`);
             console.log(`   SHA: ${fromSHA.substring(0, 8)}`);
             console.log(`   Git tag: ${gitTag}`);
             // Show deployment status
-            await this.showEnvironmentStatus(componentName, toEnv, entityType);
+            await this.showEnvironmentStatus(componentName, toEnv, entityType, prefix);
             console.log(`\n💡 Push with: git push origin ${gitTag} --force`);
         }
         catch (error) {
@@ -210,27 +224,28 @@ export class DeployCommand extends Command {
         if (!component) {
             throw new EdgitError('COMPONENT_NOT_FOUND', `Component '${componentName}' not found`);
         }
-        // Get the entity type from the component's actual type for type-specific namespaces
+        // Get the entity type and prefix from the component
         const entityType = componentTypeToEntityType(component.type);
+        const prefix = inferPrefixFromPath(component.path);
         try {
             let rollbackSHA;
             let rollbackVersion;
             if (targetVersion) {
                 // Rollback to specific version
-                rollbackSHA = await this.tagManager.resolveRef(componentName, targetVersion, entityType);
+                rollbackSHA = await this.tagManager.resolveRefToSHA(targetVersion);
                 rollbackVersion = targetVersion;
             }
             else {
                 // Find previous version (simplified - get second-to-last version tag)
-                const versionTags = await this.tagManager.getVersionTags(componentName, entityType);
+                const versionTags = await this.tagManager.getVersionTags(prefix, entityType, componentName);
                 if (versionTags.length < 2) {
                     throw new EdgitError('DEPLOYMENT_NOT_FOUND', `No previous version found for rollback of '${componentName}'`);
                 }
-                rollbackVersion = versionTags[versionTags.length - 2]; // Second-to-last (guaranteed to exist)
-                rollbackSHA = await this.tagManager.getTagSHA(componentName, rollbackVersion, entityType);
+                rollbackVersion = versionTags[versionTags.length - 2].slot; // Second-to-last (guaranteed to exist)
+                rollbackSHA = await this.tagManager.getTagSHA(prefix, entityType, componentName, rollbackVersion);
             }
-            // Move deployment tag to rollback SHA
-            const gitTag = await this.tagManager.moveDeploymentTag(componentName, environment, rollbackSHA, entityType, `Rollback ${componentName} in ${environment} to ${rollbackVersion}`);
+            // Set environment tag to rollback SHA
+            const gitTag = await this.tagManager.setEnvironmentTag(prefix, entityType, componentName, environment, rollbackSHA, `Rollback ${componentName} in ${environment} to ${rollbackVersion}`);
             console.log(`✅ Rolled back ${componentName} in ${environment} to ${rollbackVersion}`);
             console.log(`   SHA: ${rollbackSHA.substring(0, 8)}`);
             console.log(`   Git tag: ${gitTag}`);
@@ -268,10 +283,11 @@ export class DeployCommand extends Command {
             console.log(`   ⚠️ Component '${componentName}' not found`);
             return;
         }
-        // Get the entity type from the component's actual type for type-specific namespaces
+        // Get the entity type and prefix from the component
         const entityType = componentTypeToEntityType(component.type);
+        const prefix = inferPrefixFromPath(component.path);
         try {
-            const deploymentTags = await this.tagManager.getDeploymentTags(componentName, entityType);
+            const deploymentTags = await this.tagManager.getEnvironmentTags(prefix, entityType, componentName);
             console.log(`📦 ${componentName} (${component.type})`);
             console.log(`   Path: ${component.path}`);
             if (deploymentTags.length === 0) {
@@ -279,8 +295,8 @@ export class DeployCommand extends Command {
                 return;
             }
             console.log('   Deployments:');
-            for (const env of deploymentTags) {
-                await this.showEnvironmentStatus(componentName, env, entityType, '     ');
+            for (const envTag of deploymentTags) {
+                await this.showEnvironmentStatus(componentName, envTag.slot, entityType, prefix, '     ');
             }
         }
         catch (error) {
@@ -293,10 +309,11 @@ export class DeployCommand extends Command {
     /**
      * Show status for a specific environment
      */
-    async showEnvironmentStatus(componentName, environment, entityType, indent = '   ') {
+    async showEnvironmentStatus(componentName, environment, entityType, prefix, indent = '   ') {
         try {
-            const sha = await this.tagManager.getTagSHA(componentName, environment, entityType);
-            const tagInfo = await this.tagManager.getTagInfo(componentName, environment, entityType);
+            const sha = await this.tagManager.getTagSHA(prefix, entityType, componentName, environment);
+            const gitTagPath = this.tagManager.buildTagPath(prefix, entityType, componentName, environment);
+            const tagInfo = await this.tagManager.getTagInfo(gitTagPath);
             // Try to extract version from deployment tag message first
             let version = 'custom';
             const deployMessage = tagInfo.message;
@@ -307,13 +324,13 @@ export class DeployCommand extends Command {
             }
             else {
                 // Fallback: find matching version tags and use the latest one
-                const versionTags = await this.tagManager.getVersionTags(componentName, entityType);
+                const versionTags = await this.tagManager.getVersionTags(prefix, entityType, componentName);
                 const matchingVersions = [];
                 for (const versionTag of versionTags) {
                     try {
-                        const versionSHA = await this.tagManager.getTagSHA(componentName, versionTag, entityType);
+                        const versionSHA = await this.tagManager.getTagSHA(prefix, entityType, componentName, versionTag.slot);
                         if (versionSHA === sha) {
-                            matchingVersions.push(versionTag);
+                            matchingVersions.push(versionTag.slot);
                         }
                     }
                     catch {
@@ -334,9 +351,10 @@ export class DeployCommand extends Command {
     /**
      * Show deployment confirmation with the specific version that was deployed
      */
-    async showSpecificDeployment(componentName, environment, version, sha, entityType) {
+    async showSpecificDeployment(componentName, environment, version, sha, entityType, prefix) {
         try {
-            const tagInfo = await this.tagManager.getTagInfo(componentName, environment, entityType);
+            const gitTagPath = this.tagManager.buildTagPath(prefix, entityType, componentName, environment);
+            const tagInfo = await this.tagManager.getTagInfo(gitTagPath);
             console.log(`   ${environment}: ${version} (${sha.substring(0, 8)}) - ${tagInfo.date}`);
         }
         catch (error) {
@@ -351,16 +369,17 @@ export class DeployCommand extends Command {
         console.log(`🚀 Deployments in ${environment}:\n`);
         for (const { name: componentName, component } of allComponents) {
             const entityType = componentTypeToEntityType(component.type);
+            const prefix = inferPrefixFromPath(component.path);
             try {
-                const sha = await this.tagManager.getTagSHA(componentName, environment, entityType);
+                const sha = await this.tagManager.getTagSHA(prefix, entityType, componentName, environment);
                 // Find version for this SHA
-                const versionTags = await this.tagManager.getVersionTags(componentName, entityType);
+                const versionTags = await this.tagManager.getVersionTags(prefix, entityType, componentName);
                 let version = 'custom';
                 for (const versionTag of versionTags) {
                     try {
-                        const versionSHA = await this.tagManager.getTagSHA(componentName, versionTag, entityType);
+                        const versionSHA = await this.tagManager.getTagSHA(prefix, entityType, componentName, versionTag.slot);
                         if (versionSHA === sha) {
-                            version = versionTag;
+                            version = versionTag.slot;
                             break;
                         }
                     }
@@ -384,9 +403,10 @@ export class DeployCommand extends Command {
         // Collect all environments
         for (const { name: componentName, component } of allComponents) {
             const entityType = componentTypeToEntityType(component.type);
+            const prefix = inferPrefixFromPath(component.path);
             try {
-                const deploymentTags = await this.tagManager.getDeploymentTags(componentName, entityType);
-                deploymentTags.forEach((env) => environments.add(env));
+                const deploymentTags = await this.tagManager.getEnvironmentTags(prefix, entityType, componentName);
+                deploymentTags.forEach((envTag) => environments.add(envTag.slot));
             }
             catch {
                 // Continue
@@ -444,10 +464,14 @@ EXAMPLES:
   edgit deploy rollback extraction-prompt --env prod     # Rollback to previous version
   edgit deploy rollback extraction-prompt --env prod --to v1.0.0 # Rollback to specific version
 
-DEPLOYMENT TAGS:
-  Deployment tags are moveable Git tags that point to specific versions
-  Format: components/<component>/<environment>
-  Example: components/extraction-prompt/prod → points to a version SHA
+DEPLOYMENT TAGS (4-level format):
+  Format: {prefix}/{type}/{name}/{environment}
+  prefix: components (hot-swappable) or logic (requires rebuild)
+  type: prompts, agents, schemas, etc.
+  name: component name
+  environment: prod, staging, etc.
+
+  Example: components/prompts/extraction-prompt/prod → points to a version SHA
 
 NOTES:
   - Deployment tags are force-pushed (they can move)

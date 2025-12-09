@@ -15,7 +15,7 @@ import { GitWrapper } from './utils/git.js'
 import { setupEdgit } from './commands/init.js'
 import { ComponentsCommand } from './commands/components.js'
 import { TagCommand } from './commands/tag.js'
-import { DeployCommand } from './commands/deploy.js'
+import { PushCommand } from './commands/push.js'
 import { commitWithVersioning } from './commands/commit.js'
 import { DiscoverCommand } from './commands/discover.js'
 import { DetectCommand } from './commands/detect.js'
@@ -94,8 +94,7 @@ function parseArgs(argv: string[]): ParsedArgs {
 function isSubcommand(command: string, arg: string): boolean {
   const subcommands: Record<string, string[]> = {
     components: ['list', 'ls', 'show', 'checkout', 'add', 'remove', 'rm'],
-    tag: ['create', 'list', 'show', 'delete', 'push'],
-    deploy: ['set', 'promote', 'status', 'list', 'rollback'],
+    tag: ['create', 'set', 'list', 'show', 'delete', 'push'],
     discover: ['scan', 'detect', 'patterns'],
     patterns: ['list', 'add', 'remove', 'show'],
   }
@@ -168,18 +167,15 @@ ${colors.bold('COMPONENT MANAGEMENT:')}
 
 ${colors.bold('GIT TAG-BASED VERSIONING:')}
   tag create <comp> <version>  Create immutable version tag (v1.0.0)
-  tag create <comp> <env>      Create/move deployment tag (prod, staging)
+  tag set <comp> <env> [ref]   Set/move environment tag (staging, production)
   tag list [component]         List tags for component(s)
   tag show <comp>@<tag>        Show detailed tag information
   tag delete <comp>@<tag>      Delete a tag
-  tag push [component]         Push tags to remote
 
-${colors.bold('DEPLOYMENT MANAGEMENT:')}
-  deploy set <comp> <ver> --to <env>     Deploy version to environment
-  deploy promote <comp> --from <src> --to <dst> Promote between environments
-  deploy status [component]              Show deployment status
-  deploy list [environment]              List deployments
-  deploy rollback <comp> --env <env>     Rollback deployment
+${colors.bold('GIT PUSH (Thin Wrapper):')}
+  push                         Push commits only
+  push --tags                  Push commits + all tags
+  push --tags --force          Push with force (for moved env tags)
 
 ${colors.bold('DISCOVERY & ANALYSIS:')}
   discover scan [options]      Find potential components
@@ -197,13 +193,9 @@ ${colors.bold('EXAMPLES:')}
 
   ${colors.dim('# Git tag versioning')}
   ${colors.accent('edgit tag create extraction-prompt v1.0.0')}    ${colors.dim('# Create version')}
-  ${colors.accent('edgit tag create extraction-prompt prod')}      ${colors.dim('# Create deployment tag')}
+  ${colors.accent('edgit tag set extraction-prompt staging v1.0.0')}  ${colors.dim('# Deploy to staging')}
+  ${colors.accent('edgit push --tags --force')}                    ${colors.dim('# Push env tags')}
   ${colors.accent('edgit tag list extraction-prompt')}             ${colors.dim('# List all tags')}
-
-  ${colors.dim('# Deployment workflows')}
-  ${colors.accent('edgit deploy set extraction-prompt v1.0.0 --to staging')}
-  ${colors.accent('edgit deploy promote extraction-prompt --from staging --to prod')}
-  ${colors.accent('edgit deploy status')}                          ${colors.dim('# Show all deployments')}
 
   ${colors.dim('# Discovery')}
   ${colors.accent('edgit discover scan --type prompt')}            ${colors.dim('# Find potential prompts')}
@@ -211,14 +203,14 @@ ${colors.bold('EXAMPLES:')}
 
 ${colors.bold('KEY CONCEPTS:')}
   • Components are minimal manifests (path + type) in .edgit/components.json
-  • All versioning is handled by Git tags: components/<name>/<version>
-  • Version tags (v1.0.0) are immutable, deployment tags (prod) can move
-  • No merge conflicts - Git tags are the source of truth
-  • AI-powered commit messages analyze component changes
+  • All versioning via Git tags: {prefix}/{type}/{name}/{slot}
+  • Prefixes: components/* (hot-swap) vs logic/* (rebuild required)
+  • Version tags (v1.0.0) are immutable, env tags (staging) can move
+  • Edgit's job ends at 'git push' - GitHub Actions handles the rest
 
 ${colors.bold('GIT PASSTHROUGH:')}
   All other commands are passed through to git unchanged.
-  Examples: edgit branch, edgit log, edgit push, etc.
+  Examples: edgit branch, edgit log, edgit diff, etc.
 `)
   console.log(colors.dim('Docs:'), colors.underline('https://docs.ensemble.ai/edgit'))
 }
@@ -304,14 +296,16 @@ async function main(): Promise<void> {
         await tagCmd.execute(tagArgs)
         break
 
-      case 'deploy':
-        const deployCmd = new DeployCommand()
-        const deployArgs = [subcommand, ...args].filter(Boolean) as string[]
+      case 'push':
+        // Thin git push wrapper - edgit's job ends at git push
+        const pushCmd = new PushCommand()
+        const pushArgs = [...args]
         if (parsed.options.help) {
-          deployArgs.push('--help')
+          pushArgs.push('--help')
         }
-        await deployCmd.execute(deployArgs)
+        await pushCmd.execute(pushArgs)
         break
+
       case 'discover':
         const discoverCmd = new DiscoverCommand()
         const discoverArgs = [subcommand, ...args].filter(Boolean) as string[]
@@ -471,14 +465,28 @@ async function runCore(): Promise<void> {
       await tagCmd.execute(tagArgs)
       break
 
-    case 'deploy':
-      const deployCmd = new DeployCommand()
-      const deployArgs = [subcommand, ...args].filter(Boolean) as string[]
+    case 'push':
+      // Thin git push wrapper - edgit's job ends at git push
+      const pushCmd = new PushCommand()
+      const pushArgs = [...args]
       if (parsed.options.help) {
-        deployArgs.push('--help')
+        pushArgs.push('--help')
       }
-      await deployCmd.execute(deployArgs)
+      await pushCmd.execute(pushArgs)
       break
+
+    case 'deploy':
+      // Deprecated: deploy command removed in favor of tag set + push
+      console.log('')
+      console.log(colors.warning('⚠️  The "deploy" command has been removed.'))
+      console.log('')
+      console.log(colors.bold('Use instead:'))
+      console.log(`  ${colors.accent('edgit tag set <component> <env> <version>')}`)
+      console.log(`  ${colors.accent('edgit push --tags --force')}`)
+      throw new EdgitError(
+        'VALIDATION_ERROR',
+        'The deploy command has been removed. Use "edgit tag set" + "edgit push --tags --force" instead.'
+      )
     case 'discover':
       const discoverCmd = new DiscoverCommand()
       const discoverArgs = [subcommand, ...args].filter(Boolean) as string[]

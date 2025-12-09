@@ -2,9 +2,14 @@ import type { GitWrapper } from './git.js'
 import type { Result } from '../types/result.js'
 
 /**
+ * Tag prefix - determines what happens on push
+ * - components: Syncs to KV (hot-swappable)
+ * - logic: Triggers Worker rebuild
+ */
+export type TagPrefix = 'components' | 'logic'
+
+/**
  * Entity types that can be versioned
- * Aligned with Conductor's ComponentType for seamless integration
- *
  * Each type gets its own namespace (pluralized):
  * - agent → agents/
  * - prompt → prompts/
@@ -15,9 +20,7 @@ import type { Result } from '../types/result.js'
  * - script → scripts/
  * - ensemble → ensembles/
  * - tool → tools/
- *
- * Legacy 'component' type is still supported for backwards compatibility
- * and maps to 'components/' namespace.
+ * - route → routes/
  */
 export type EntityType =
   | 'agent'
@@ -29,13 +32,58 @@ export type EntityType =
   | 'script'
   | 'ensemble'
   | 'tool'
-  | 'agent-definition' // Alias for agent
-  | 'component' // Legacy - maps to 'components/' for backwards compatibility
+  | 'route'
 
 /**
- * Git Tag Manager for Edgit component and agent versioning and deployment
- * Handles namespaced tags with separation between version and deployment tags
- * Uses type-specific namespaces (prompts/, schemas/, templates/, etc.)
+ * Slot type - determines mutability
+ * - version: Immutable, semver format (v1.0.0)
+ * - environment: Mutable, can be moved (main, staging, production)
+ */
+export type SlotType = 'version' | 'environment'
+
+/**
+ * Parsed tag information
+ */
+export interface ParsedTag {
+  prefix: TagPrefix
+  type: string // prompts, agents, schemas, etc.
+  name: string // extraction, classifier, etc.
+  slot: string // v1.0.0, production, main, etc.
+  slotType: SlotType
+  fullTag: string // The complete git tag path
+}
+
+/**
+ * Tag information with git metadata
+ */
+export interface TagInfo {
+  tag: string
+  sha: string
+  date: string
+  message: string
+  author: string
+}
+
+/**
+ * Extended tag info including parsed components
+ */
+export interface ExtendedTagInfo extends TagInfo, ParsedTag {}
+
+/**
+ * Git Tag Manager for Edgit component versioning
+ *
+ * Implements the 4-level tag hierarchy:
+ *   {prefix}/{type}/{name}/{slot}
+ *
+ * Where:
+ * - prefix: 'components' or 'logic'
+ * - type: prompts, agents, schemas, ensembles, etc.
+ * - name: component name (e.g., extraction, classifier)
+ * - slot: version (v1.0.0) or environment (main, staging, production)
+ *
+ * Philosophy: Edgit is a thin git wrapper. It creates and manages git tags.
+ * It doesn't deploy, doesn't sync to KV, doesn't communicate with Cloudflare.
+ * GitHub Actions handles everything after `git push`.
  */
 export class GitTagManager {
   private git: GitWrapper
@@ -44,52 +92,106 @@ export class GitTagManager {
     this.git = git
   }
 
+  // ============================================================================
+  // Tag Format Utilities
+  // ============================================================================
+
   /**
-   * Get namespace prefix for entity type
-   * Pluralizes the type name to create the namespace
-   *
-   * Examples:
-   * - 'agent' → 'agents'
-   * - 'prompt' → 'prompts'
-   * - 'schema' → 'schemas'
-   * - 'query' → 'queries' (special case)
-   * - 'component' → 'components' (legacy)
+   * Get namespace (pluralized type name) for entity type
    */
-  private getNamespace(entityType: EntityType): string {
-    // Handle special cases
+  getNamespace(entityType: EntityType): string {
     switch (entityType) {
       case 'agent':
-      case 'agent-definition':
         return 'agents'
       case 'query':
-        return 'queries' // Special pluralization
-      case 'component':
-        return 'components' // Legacy support
+        return 'queries'
       default:
-        // Standard pluralization: add 's'
         return `${entityType}s`
     }
   }
 
   /**
-   * Create a namespaced tag for component or agent
-   * @param name Entity name (component or agent name)
-   * @param tagName Tag name (e.g., 'v1.0.0', 'prod', 'staging')
-   * @param entityType Entity type ('component' or 'agent')
-   * @param sha Optional SHA to tag (defaults to HEAD)
-   * @param message Optional tag message
+   * Check if a slot is a version (semver format)
    */
-  async tag(
+  isVersionSlot(slot: string): boolean {
+    return /^v\d+\.\d+\.\d+(-[\w.]+)?$/.test(slot)
+  }
+
+  /**
+   * Check if a slot is an environment (not a version)
+   */
+  isEnvironmentSlot(slot: string): boolean {
+    return !this.isVersionSlot(slot)
+  }
+
+  /**
+   * Get slot type from slot string
+   */
+  getSlotType(slot: string): SlotType {
+    return this.isVersionSlot(slot) ? 'version' : 'environment'
+  }
+
+  /**
+   * Build a 4-level tag path
+   * Format: {prefix}/{type}/{name}/{slot}
+   */
+  buildTagPath(prefix: TagPrefix, entityType: EntityType, name: string, slot: string): string {
+    const namespace = this.getNamespace(entityType)
+    return `${prefix}/${namespace}/${name}/${slot}`
+  }
+
+  /**
+   * Parse a 4-level tag path
+   * Returns null if format is invalid
+   */
+  parseTagPath(tag: string): ParsedTag | null {
+    const parts = tag.split('/')
+    if (parts.length !== 4) return null
+
+    const [prefix, type, name, slot] = parts
+
+    if (prefix !== 'components' && prefix !== 'logic') return null
+    if (!type || !name || !slot) return null
+
+    return {
+      prefix: prefix as TagPrefix,
+      type,
+      name,
+      slot,
+      slotType: this.getSlotType(slot),
+      fullTag: tag,
+    }
+  }
+
+  // ============================================================================
+  // Core Tag Operations
+  // ============================================================================
+
+  /**
+   * Create an immutable version tag
+   * Version tags cannot be overwritten
+   */
+  async createVersionTag(
+    prefix: TagPrefix,
+    entityType: EntityType,
     name: string,
-    tagName: string,
-    entityType: EntityType = 'component',
+    version: string,
     sha?: string,
     message?: string
   ): Promise<string> {
-    const namespace = this.getNamespace(entityType)
-    const gitTag = `${namespace}/${name}/${tagName}`
+    if (!this.isVersionSlot(version)) {
+      throw new Error(`Invalid semver version: ${version}. Use format: v1.0.0`)
+    }
+
+    const gitTag = this.buildTagPath(prefix, entityType, name, version)
+
+    const exists = await this.tagExistsByPath(gitTag)
+    if (exists) {
+      throw new Error(`Tag already exists: ${gitTag}. Version tags are immutable.`)
+    }
+
     const target = sha || 'HEAD'
-    const tagMessage = message || `Tag ${entityType} ${name} as ${tagName}`
+    const tagMessage = message || `Release ${entityType} ${name} ${version}`
 
     const result = await this.git.exec(['tag', '-a', gitTag, target, '-m', tagMessage])
 
@@ -101,231 +203,112 @@ export class GitTagManager {
   }
 
   /**
-   * Create a namespaced component tag (backward compatible)
-   * @deprecated Use tag() with specific entityType (prompt, schema, template, etc.) instead
+   * Create or move an environment tag
+   * Environment tags are mutable and can be moved with force
    */
-  async tagComponent(
-    component: string,
-    tagName: string,
-    sha?: string,
-    message?: string
-  ): Promise<string> {
-    // Legacy: uses generic 'components/' namespace
-    // For type-specific namespaces, use tag() with the actual type
-    return this.tag(component, tagName, 'component', sha, message)
-  }
-
-  /**
-   * Create a namespaced agent tag
-   * @param agent Agent name
-   * @param tagName Tag name (e.g., 'v1.0.0', 'prod', 'staging')
-   * @param sha Optional SHA to tag (defaults to HEAD)
-   * @param message Optional tag message
-   */
-  async tagAgent(agent: string, tagName: string, sha?: string, message?: string): Promise<string> {
-    return this.tag(agent, tagName, 'agent', sha, message)
-  }
-
-  /**
-   * List all tags for a specific entity
-   * @param name Entity name
-   * @param entityType Entity type ('component' or 'agent')
-   * @returns Array of tag names (without namespace prefix)
-   */
-  async listTags(name: string, entityType: EntityType = 'component'): Promise<string[]> {
-    const namespace = this.getNamespace(entityType)
-    const result = await this.git.exec(['tag', '-l', `${namespace}/${name}/*`])
-
-    if (result.exitCode !== 0) {
-      return []
-    }
-
-    return result.stdout
-      .split('\n')
-      .filter((line) => line.trim())
-      .map((tag) => tag.replace(`${namespace}/${name}/`, ''))
-  }
-
-  /**
-   * List all tags for a specific component (backward compatible)
-   * @deprecated Use listTags() with entityType parameter instead
-   */
-  async listComponentTags(component: string): Promise<string[]> {
-    return this.listTags(component, 'component')
-  }
-
-  /**
-   * List all tags for a specific agent
-   * @param agent Agent name
-   * @returns Array of tag names (without namespace prefix)
-   */
-  async listAgentTags(agent: string): Promise<string[]> {
-    return this.listTags(agent, 'agent')
-  }
-
-  /**
-   * Get the SHA that a tag points to
-   * @param name Entity name
-   * @param tagName Tag name
-   * @param entityType Entity type ('component' or 'agent')
-   * @returns SHA hash
-   */
-  async getTagSHA(
-    name: string,
-    tagName: string,
-    entityType: EntityType = 'component'
-  ): Promise<string> {
-    const namespace = this.getNamespace(entityType)
-    const gitTag = `${namespace}/${name}/${tagName}`
-    const result = await this.git.exec(['rev-list', '-n', '1', gitTag])
-
-    if (result.exitCode !== 0) {
-      throw new Error(`Tag not found: ${gitTag}`)
-    }
-
-    return result.stdout.trim()
-  }
-
-  /**
-   * Check if a tag exists
-   * @param name Entity name
-   * @param tagName Tag name
-   * @param entityType Entity type ('component' or 'agent')
-   * @returns True if tag exists
-   */
-  async tagExists(
-    name: string,
-    tagName: string,
-    entityType: EntityType = 'component'
-  ): Promise<boolean> {
-    try {
-      await this.getTagSHA(name, tagName, entityType)
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  /**
-   * Move a deployment tag to a new target (with force)
-   * Used for deployment tags like 'prod', 'staging' that can move
-   * @param name Entity name
-   * @param env Environment name (prod, staging, etc.)
-   * @param targetRef Target SHA, tag, or ref
-   * @param entityType Entity type ('component' or 'agent')
-   * @param message Optional tag message
-   */
-  async moveDeploymentTag(
+  async setEnvironmentTag(
+    prefix: TagPrefix,
+    entityType: EntityType,
     name: string,
     env: string,
-    targetRef: string,
-    entityType: EntityType = 'component',
+    targetRef: string = 'HEAD',
     message?: string
   ): Promise<string> {
-    // Resolve target to SHA
-    const targetSHA = await this.resolveRef(name, targetRef, entityType)
-    const namespace = this.getNamespace(entityType)
-    const gitTag = `${namespace}/${name}/${env}`
-    const tagMessage = message || `Deploy ${entityType} ${name} to ${env}`
+    if (this.isVersionSlot(env)) {
+      throw new Error(`"${env}" looks like a version. Use 'createVersionTag' for version tags.`)
+    }
 
-    // Force update deployment tag
-    const result = await this.git.exec(['tag', '-f', '-a', gitTag, targetSHA, '-m', tagMessage])
+    const gitTag = this.buildTagPath(prefix, entityType, name, env)
+    const targetSHA = await this.resolveRefToSHA(targetRef)
+    const tagMessage = message || `Set ${entityType} ${name} to ${env}`
+
+    // Delete existing local tag if present
+    await this.git.exec(['tag', '-d', gitTag]).catch(() => {})
+
+    const result = await this.git.exec(['tag', '-a', gitTag, targetSHA, '-m', tagMessage])
 
     if (result.exitCode !== 0) {
-      throw new Error(`Failed to move deployment tag ${gitTag}: ${result.stderr}`)
+      throw new Error(`Failed to set environment tag ${gitTag}: ${result.stderr}`)
     }
 
     return gitTag
   }
 
   /**
-   * Create an immutable version tag
-   * Version tags cannot be overwritten (no force flag)
-   * @param name Entity name
-   * @param version Version string (e.g., 'v1.0.0')
-   * @param entityType Entity type ('component' or 'agent')
-   * @param sha Optional SHA to tag (defaults to HEAD)
-   * @param message Optional tag message
+   * Delete a tag (local only)
    */
-  async createVersionTag(
+  async deleteTag(
+    prefix: TagPrefix,
+    entityType: EntityType,
     name: string,
-    version: string,
-    entityType: EntityType = 'component',
-    sha?: string,
-    message?: string
-  ): Promise<string> {
-    // Check if version tag already exists
-    const exists = await this.tagExists(name, version, entityType)
-    if (exists) {
-      throw new Error(`Version tag ${version} already exists for ${entityType} ${name}`)
-    }
+    slot: string
+  ): Promise<void> {
+    const gitTag = this.buildTagPath(prefix, entityType, name, slot)
 
-    const tagMessage = message || `Release ${entityType} ${name} ${version}`
-    return await this.tag(name, version, entityType, sha, tagMessage)
+    const result = await this.git.exec(['tag', '-d', gitTag])
+    if (result.exitCode !== 0) {
+      throw new Error(`Failed to delete tag ${gitTag}: ${result.stderr}`)
+    }
   }
 
   /**
-   * Resolve a reference to a SHA
-   * Handles SHAs, tags, version tags, deployment tags
-   * @param name Entity name
-   * @param ref Reference string (SHA, tag name, etc.)
-   * @param entityType Entity type ('component' or 'agent')
-   * @returns SHA hash
+   * List all tags matching the 4-level pattern
    */
-  async resolveRef(
-    name: string,
-    ref: string,
-    entityType: EntityType = 'component'
-  ): Promise<string> {
-    // If it looks like a SHA, try to resolve it directly
-    if (ref.match(/^[0-9a-f]{6,40}$/i)) {
-      const result = await this.git.exec(['rev-parse', ref])
-      if (result.exitCode === 0) {
-        return result.stdout.trim()
-      }
+  async listTags(
+    prefix?: TagPrefix,
+    entityType?: EntityType,
+    name?: string
+  ): Promise<ExtendedTagInfo[]> {
+    let pattern: string
+    if (prefix && entityType && name) {
+      const namespace = this.getNamespace(entityType)
+      pattern = `${prefix}/${namespace}/${name}/*`
+    } else if (prefix && entityType) {
+      const namespace = this.getNamespace(entityType)
+      pattern = `${prefix}/${namespace}/*/*`
+    } else if (prefix) {
+      pattern = `${prefix}/*/*/*`
+    } else {
+      pattern = '{components,logic}/*/*/*'
     }
 
-    // Try as an entity tag
-    try {
-      return await this.getTagSHA(name, ref, entityType)
-    } catch {
-      // Fall back to git's rev-parse
-      const result = await this.git.exec(['rev-parse', ref])
-      if (result.exitCode === 0) {
-        return result.stdout.trim()
-      }
-    }
-
-    throw new Error(`Could not resolve reference: ${ref}`)
-  }
-
-  /**
-   * Get detailed tag information
-   * @param name Entity name
-   * @param tagName Tag name
-   * @param entityType Entity type ('component' or 'agent')
-   * @returns Tag details with SHA, date, message, author
-   */
-  async getTagInfo(
-    name: string,
-    tagName: string,
-    entityType: EntityType = 'component'
-  ): Promise<{
-    tag: string
-    sha: string
-    date: string
-    message: string
-    author: string
-  }> {
-    const namespace = this.getNamespace(entityType)
-    const gitTag = `${namespace}/${name}/${tagName}`
-
-    // Get tag object info
-    // Use %(if)%(*objectname)%(then)%(*objectname)%(else)%(objectname)%(end) to handle both
-    // annotated tags (dereferenced) and lightweight tags
     const result = await this.git.exec([
       'for-each-ref',
-      '--format=%(if)%(*objectname)%(then)%(*objectname)%(else)%(objectname)%(end)|%(authordate:iso)|%(contents:subject)|%(authorname)',
+      '--format=%(refname:short)|%(if)%(*objectname)%(then)%(*objectname)%(else)%(objectname)%(end)|%(creatordate:iso)|%(contents:subject)|%(authorname)',
+      `refs/tags/${pattern}`,
+    ])
+
+    if (result.exitCode !== 0 || !result.stdout.trim()) {
+      return []
+    }
+
+    return result.stdout
+      .trim()
+      .split('\n')
+      .map((line) => {
+        const [fullTag, sha, date, message, author] = line.split('|')
+        const parsed = this.parseTagPath(fullTag || '')
+        if (!parsed) return null
+
+        return {
+          ...parsed,
+          tag: parsed.slot,
+          sha: sha || '',
+          date: date || '',
+          message: message || '',
+          author: author || '',
+        }
+      })
+      .filter((info): info is ExtendedTagInfo => info !== null)
+  }
+
+  /**
+   * Get tag info by full path
+   */
+  async getTagInfo(gitTag: string): Promise<TagInfo> {
+    const result = await this.git.exec([
+      'for-each-ref',
+      '--format=%(if)%(*objectname)%(then)%(*objectname)%(else)%(objectname)%(end)|%(creatordate:iso)|%(contents:subject)|%(authorname)',
       `refs/tags/${gitTag}`,
     ])
 
@@ -334,15 +317,12 @@ export class GitTagManager {
     }
 
     const parts = result.stdout.trim().split('|')
-    if (parts.length < 4) {
-      throw new Error(`Invalid tag format for: ${gitTag}`)
-    }
-
-    const [commitSHA, date, message, author] = parts
+    const [sha, date, message, author] = parts
+    const tagName = gitTag.split('/').pop() || gitTag
 
     return {
       tag: tagName,
-      sha: commitSHA || '',
+      sha: sha || '',
       date: date || '',
       message: message || '',
       author: author || '',
@@ -350,165 +330,131 @@ export class GitTagManager {
   }
 
   /**
-   * Get all version tags (sorted by semantic version)
-   * @param name Entity name
-   * @param entityType Entity type ('component' or 'agent')
-   * @returns Array of version tag names sorted by version
+   * Check if a tag exists by full path
    */
-  async getVersionTags(name: string, entityType: EntityType = 'component'): Promise<string[]> {
-    const tags = await this.listTags(name, entityType)
-    const versionTags = tags.filter((tag) => tag.match(/^v?\d+\.\d+\.\d+/))
-
-    // Sort version tags semantically
-    return versionTags.sort((a, b) => {
-      const aVersion = a
-        .replace(/^v/, '')
-        .split('.')
-        .map((n) => parseInt(n, 10))
-      const bVersion = b
-        .replace(/^v/, '')
-        .split('.')
-        .map((n) => parseInt(n, 10))
-
-      for (let i = 0; i < Math.min(aVersion.length, bVersion.length); i++) {
-        const aNum = aVersion[i] || 0
-        const bNum = bVersion[i] || 0
-        if (aNum !== bNum) {
-          return aNum - bNum
-        }
-      }
-      return aVersion.length - bVersion.length
-    })
+  async tagExistsByPath(gitTag: string): Promise<boolean> {
+    const result = await this.git.exec(['tag', '-l', gitTag])
+    return result.stdout.trim() === gitTag
   }
 
   /**
-   * Get all deployment tags
-   * @param name Entity name
-   * @param entityType Entity type ('component' or 'agent')
-   * @returns Array of deployment tag names
+   * Check if a tag exists
    */
-  async getDeploymentTags(name: string, entityType: EntityType = 'component'): Promise<string[]> {
-    const tags = await this.listTags(name, entityType)
-    const deploymentTags = ['prod', 'staging', 'canary', 'latest', 'dev']
-
-    return tags.filter((tag) => deploymentTags.includes(tag))
-  }
-
-  /**
-   * Push tags to remote
-   * @param name Entity name
-   * @param entityType Entity type ('component' or 'agent')
-   * @param tagNames Optional specific tags to push (defaults to all)
-   * @param force Whether to force push (for deployment tags)
-   */
-  async pushTags(
+  async tagExists(
+    prefix: TagPrefix,
+    entityType: EntityType,
     name: string,
-    entityType: EntityType = 'component',
-    tagNames?: string[],
-    force: boolean = false
-  ): Promise<void> {
-    const tags = tagNames || (await this.listTags(name, entityType))
-    const namespace = this.getNamespace(entityType)
-
-    for (const tagName of tags) {
-      const gitTag = `${namespace}/${name}/${tagName}`
-      const args = ['push', 'origin', `refs/tags/${gitTag}`]
-      if (force) {
-        args.push('--force')
-      }
-
-      const result = await this.git.exec(args)
-      if (result.exitCode !== 0) {
-        console.warn(`Warning: Failed to push tag ${gitTag}: ${result.stderr}`)
-      }
-    }
+    slot: string
+  ): Promise<boolean> {
+    const gitTag = this.buildTagPath(prefix, entityType, name, slot)
+    return this.tagExistsByPath(gitTag)
   }
 
   /**
-   * Delete a tag
-   * @param name Entity name
-   * @param tagName Tag name to delete
-   * @param entityType Entity type ('component' or 'agent')
-   * @param deleteRemote Whether to also delete from remote
+   * Resolve any ref (SHA, tag, branch) to a SHA
    */
-  async deleteTag(
-    name: string,
-    tagName: string,
-    entityType: EntityType = 'component',
-    deleteRemote: boolean = false
-  ): Promise<void> {
-    const namespace = this.getNamespace(entityType)
-    const gitTag = `${namespace}/${name}/${tagName}`
-
-    // Delete local tag
-    const result = await this.git.exec(['tag', '-d', gitTag])
+  async resolveRefToSHA(ref: string): Promise<string> {
+    const result = await this.git.exec(['rev-parse', '--verify', ref])
     if (result.exitCode !== 0) {
-      throw new Error(`Failed to delete tag ${gitTag}: ${result.stderr}`)
+      throw new Error(`Invalid ref: ${ref}. Not a valid commit, branch, or tag.`)
     }
+    return result.stdout.trim()
+  }
 
-    // Delete remote tag if requested
-    if (deleteRemote) {
-      const pushResult = await this.git.exec(['push', 'origin', `:refs/tags/${gitTag}`])
-      if (pushResult.exitCode !== 0) {
-        console.warn(`Warning: Failed to delete remote tag ${gitTag}: ${pushResult.stderr}`)
-      }
+  /**
+   * Get SHA that a tag points to
+   */
+  async getTagSHA(
+    prefix: TagPrefix,
+    entityType: EntityType,
+    name: string,
+    slot: string
+  ): Promise<string> {
+    const gitTag = this.buildTagPath(prefix, entityType, name, slot)
+    const result = await this.git.exec(['rev-list', '-n', '1', gitTag])
+    if (result.exitCode !== 0) {
+      throw new Error(`Tag not found: ${gitTag}`)
     }
+    return result.stdout.trim()
   }
 
   /**
    * Get file content at a specific tag
-   * @param name Entity name
-   * @param tagName Tag name
-   * @param filePath File path within the repository
-   * @param entityType Entity type ('component' or 'agent')
-   * @returns File content as string
    */
   async getFileAtTag(
+    prefix: TagPrefix,
+    entityType: EntityType,
     name: string,
-    tagName: string,
-    filePath: string,
-    entityType: EntityType = 'component'
+    slot: string,
+    filePath: string
   ): Promise<string> {
-    const sha = await this.getTagSHA(name, tagName, entityType)
+    const sha = await this.getTagSHA(prefix, entityType, name, slot)
     const result = await this.git.exec(['show', `${sha}:${filePath}`])
 
     if (result.exitCode !== 0) {
-      throw new Error(`File not found at tag: ${filePath} at ${entityType} ${name}@${tagName}`)
+      throw new Error(`File not found: ${filePath} at ${name}@${slot}`)
     }
 
     return result.stdout
   }
+
+  /**
+   * Get all version tags for a component (sorted by semver)
+   */
+  async getVersionTags(
+    prefix: TagPrefix,
+    entityType: EntityType,
+    name: string
+  ): Promise<ExtendedTagInfo[]> {
+    const tags = await this.listTags(prefix, entityType, name)
+    return tags
+      .filter((t) => t.slotType === 'version')
+      .sort((a, b) => {
+        const aVersion = a.slot
+          .replace(/^v/, '')
+          .split('.')
+          .map((n) => parseInt(n, 10))
+        const bVersion = b.slot
+          .replace(/^v/, '')
+          .split('.')
+          .map((n) => parseInt(n, 10))
+
+        for (let i = 0; i < Math.min(aVersion.length, bVersion.length); i++) {
+          const aNum = aVersion[i] ?? 0
+          const bNum = bVersion[i] ?? 0
+          if (aNum !== bNum) {
+            return aNum - bNum
+          }
+        }
+        return aVersion.length - bVersion.length
+      })
+  }
+
+  /**
+   * Get all environment tags for a component
+   */
+  async getEnvironmentTags(
+    prefix: TagPrefix,
+    entityType: EntityType,
+    name: string
+  ): Promise<ExtendedTagInfo[]> {
+    const tags = await this.listTags(prefix, entityType, name)
+    return tags.filter((t) => t.slotType === 'environment')
+  }
 }
 
 // ============================================================================
-// Result-based API Methods (non-throwing alternatives)
+// Result-based API (non-throwing alternatives)
 // ============================================================================
 
-/**
- * Git tag error types for Result-based API
- */
 export type GitTagError =
   | { kind: 'tag_exists'; tag: string; message: string }
   | { kind: 'tag_not_found'; tag: string; message: string }
   | { kind: 'git_error'; message: string; stderr?: string }
   | { kind: 'invalid_ref'; ref: string; message: string }
+  | { kind: 'invalid_version'; version: string; message: string }
   | { kind: 'file_not_found'; path: string; tag: string; message: string }
 
-/**
- * Tag information returned by Result-based methods
- */
-export interface TagInfo {
-  tag: string
-  sha: string
-  date: string
-  message: string
-  author: string
-}
-
-/**
- * Result-based GitTagManager methods
- * These provide explicit error handling without throwing exceptions
- */
 export class GitTagManagerResult {
   private manager: GitTagManager
 
@@ -516,132 +462,130 @@ export class GitTagManagerResult {
     this.manager = new GitTagManager(git)
   }
 
-  /**
-   * Create a tag with Result-based error handling
-   */
-  async createTag(
-    name: string,
-    tagName: string,
-    entityType: EntityType = 'component',
-    sha?: string,
-    message?: string
-  ): Promise<Result<string, GitTagError>> {
-    try {
-      const gitTag = await this.manager.tag(name, tagName, entityType, sha, message)
-      return { ok: true, value: gitTag }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      if (errorMessage.includes('already exists')) {
-        return {
-          ok: false,
-          error: {
-            kind: 'tag_exists',
-            tag: tagName,
-            message: errorMessage,
-          },
-        }
-      }
-      return {
-        ok: false,
-        error: {
-          kind: 'git_error',
-          message: errorMessage,
-        },
-      }
-    }
-  }
-
-  /**
-   * Create an immutable version tag with Result-based error handling
-   */
   async createVersionTag(
+    prefix: TagPrefix,
+    entityType: EntityType,
     name: string,
     version: string,
-    entityType: EntityType = 'component',
     sha?: string,
     message?: string
   ): Promise<Result<string, GitTagError>> {
     try {
-      const gitTag = await this.manager.createVersionTag(name, version, entityType, sha, message)
+      const gitTag = await this.manager.createVersionTag(
+        prefix,
+        entityType,
+        name,
+        version,
+        sha,
+        message
+      )
       return { ok: true, value: gitTag }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       if (errorMessage.includes('already exists')) {
+        return { ok: false, error: { kind: 'tag_exists', tag: version, message: errorMessage } }
+      }
+      if (errorMessage.includes('Invalid semver')) {
+        return { ok: false, error: { kind: 'invalid_version', version, message: errorMessage } }
+      }
+      return { ok: false, error: { kind: 'git_error', message: errorMessage } }
+    }
+  }
+
+  async setEnvironmentTag(
+    prefix: TagPrefix,
+    entityType: EntityType,
+    name: string,
+    env: string,
+    targetRef: string = 'HEAD',
+    message?: string
+  ): Promise<Result<string, GitTagError>> {
+    try {
+      const gitTag = await this.manager.setEnvironmentTag(
+        prefix,
+        entityType,
+        name,
+        env,
+        targetRef,
+        message
+      )
+      return { ok: true, value: gitTag }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      if (errorMessage.includes('looks like a version')) {
         return {
           ok: false,
-          error: {
-            kind: 'tag_exists',
-            tag: version,
-            message: errorMessage,
-          },
+          error: { kind: 'invalid_version', version: env, message: errorMessage },
         }
       }
+      if (errorMessage.includes('Invalid ref')) {
+        return { ok: false, error: { kind: 'invalid_ref', ref: targetRef, message: errorMessage } }
+      }
+      return { ok: false, error: { kind: 'git_error', message: errorMessage } }
+    }
+  }
+
+  async deleteTag(
+    prefix: TagPrefix,
+    entityType: EntityType,
+    name: string,
+    slot: string
+  ): Promise<Result<void, GitTagError>> {
+    try {
+      await this.manager.deleteTag(prefix, entityType, name, slot)
+      return { ok: true, value: undefined }
+    } catch (error) {
       return {
         ok: false,
         error: {
-          kind: 'git_error',
-          message: errorMessage,
+          kind: 'tag_not_found',
+          tag: slot,
+          message: error instanceof Error ? error.message : String(error),
         },
       }
     }
   }
 
-  /**
-   * Get tag SHA with Result-based error handling
-   */
   async getTagSHA(
+    prefix: TagPrefix,
+    entityType: EntityType,
     name: string,
-    tagName: string,
-    entityType: EntityType = 'component'
+    slot: string
   ): Promise<Result<string, GitTagError>> {
     try {
-      const sha = await this.manager.getTagSHA(name, tagName, entityType)
+      const sha = await this.manager.getTagSHA(prefix, entityType, name, slot)
       return { ok: true, value: sha }
     } catch (error) {
       return {
         ok: false,
         error: {
           kind: 'tag_not_found',
-          tag: tagName,
+          tag: slot,
           message: error instanceof Error ? error.message : String(error),
         },
       }
     }
   }
 
-  /**
-   * Get tag info with Result-based error handling
-   */
-  async getTagInfo(
-    name: string,
-    tagName: string,
-    entityType: EntityType = 'component'
-  ): Promise<Result<TagInfo, GitTagError>> {
+  async getTagInfo(gitTag: string): Promise<Result<TagInfo, GitTagError>> {
     try {
-      const info = await this.manager.getTagInfo(name, tagName, entityType)
+      const info = await this.manager.getTagInfo(gitTag)
       return { ok: true, value: info }
     } catch (error) {
       return {
         ok: false,
         error: {
           kind: 'tag_not_found',
-          tag: tagName,
+          tag: gitTag,
           message: error instanceof Error ? error.message : String(error),
         },
       }
     }
   }
 
-  /**
-   * Resolve a reference with Result-based error handling
-   */
-  async resolveRef(
-    name: string,
-    ref: string,
-    entityType: EntityType = 'component'
-  ): Promise<Result<string, GitTagError>> {
+  async resolveRefToSHA(ref: string): Promise<Result<string, GitTagError>> {
     try {
-      const sha = await this.manager.resolveRef(name, ref, entityType)
+      const sha = await this.manager.resolveRefToSHA(ref)
       return { ok: true, value: sha }
     } catch (error) {
       return {
@@ -655,17 +599,15 @@ export class GitTagManagerResult {
     }
   }
 
-  /**
-   * Get file content at tag with Result-based error handling
-   */
   async getFileAtTag(
+    prefix: TagPrefix,
+    entityType: EntityType,
     name: string,
-    tagName: string,
-    filePath: string,
-    entityType: EntityType = 'component'
+    slot: string,
+    filePath: string
   ): Promise<Result<string, GitTagError>> {
     try {
-      const content = await this.manager.getFileAtTag(name, tagName, filePath, entityType)
+      const content = await this.manager.getFileAtTag(prefix, entityType, name, slot, filePath)
       return { ok: true, value: content }
     } catch (error) {
       return {
@@ -673,101 +615,39 @@ export class GitTagManagerResult {
         error: {
           kind: 'file_not_found',
           path: filePath,
-          tag: tagName,
+          tag: slot,
           message: error instanceof Error ? error.message : String(error),
         },
       }
     }
   }
 
-  /**
-   * Move deployment tag with Result-based error handling
-   */
-  async moveDeploymentTag(
-    name: string,
-    env: string,
-    targetRef: string,
-    entityType: EntityType = 'component',
-    message?: string
-  ): Promise<Result<string, GitTagError>> {
-    try {
-      const gitTag = await this.manager.moveDeploymentTag(name, env, targetRef, entityType, message)
-      return { ok: true, value: gitTag }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      if (errorMessage.includes('Could not resolve')) {
-        return {
-          ok: false,
-          error: {
-            kind: 'invalid_ref',
-            ref: targetRef,
-            message: errorMessage,
-          },
-        }
-      }
-      return {
-        ok: false,
-        error: {
-          kind: 'git_error',
-          message: errorMessage,
-        },
-      }
-    }
-  }
-
-  /**
-   * Delete a tag with Result-based error handling
-   */
-  async deleteTag(
-    name: string,
-    tagName: string,
-    entityType: EntityType = 'component',
-    deleteRemote: boolean = false
-  ): Promise<Result<void, GitTagError>> {
-    try {
-      await this.manager.deleteTag(name, tagName, entityType, deleteRemote)
-      return { ok: true, value: undefined }
-    } catch (error) {
-      return {
-        ok: false,
-        error: {
-          kind: 'tag_not_found',
-          tag: tagName,
-          message: error instanceof Error ? error.message : String(error),
-        },
-      }
-    }
-  }
-
-  /**
-   * Access the underlying manager for non-Result methods
-   */
   get underlying(): GitTagManager {
     return this.manager
   }
 
-  // Passthrough methods that don't throw
-  listTags = (name: string, entityType?: EntityType) => this.manager.listTags(name, entityType)
-  tagExists = (name: string, tagName: string, entityType?: EntityType) =>
-    this.manager.tagExists(name, tagName, entityType)
-  getVersionTags = (name: string, entityType?: EntityType) =>
-    this.manager.getVersionTags(name, entityType)
-  getDeploymentTags = (name: string, entityType?: EntityType) =>
-    this.manager.getDeploymentTags(name, entityType)
-  pushTags = (name: string, entityType?: EntityType, tagNames?: string[], force?: boolean) =>
-    this.manager.pushTags(name, entityType, tagNames, force)
+  // Passthrough methods
+  listTags = (prefix?: TagPrefix, entityType?: EntityType, name?: string) =>
+    this.manager.listTags(prefix, entityType, name)
+  tagExists = (prefix: TagPrefix, entityType: EntityType, name: string, slot: string) =>
+    this.manager.tagExists(prefix, entityType, name, slot)
+  getVersionTags = (prefix: TagPrefix, entityType: EntityType, name: string) =>
+    this.manager.getVersionTags(prefix, entityType, name)
+  getEnvironmentTags = (prefix: TagPrefix, entityType: EntityType, name: string) =>
+    this.manager.getEnvironmentTags(prefix, entityType, name)
+  isVersionSlot = (slot: string) => this.manager.isVersionSlot(slot)
+  isEnvironmentSlot = (slot: string) => this.manager.isEnvironmentSlot(slot)
+  getSlotType = (slot: string) => this.manager.getSlotType(slot)
+  buildTagPath = (prefix: TagPrefix, entityType: EntityType, name: string, slot: string) =>
+    this.manager.buildTagPath(prefix, entityType, name, slot)
+  parseTagPath = (tag: string) => this.manager.parseTagPath(tag)
+  getNamespace = (entityType: EntityType) => this.manager.getNamespace(entityType)
 }
 
-/**
- * Convenience function to create GitTagManager instance
- */
 export function createGitTagManager(git: GitWrapper): GitTagManager {
   return new GitTagManager(git)
 }
 
-/**
- * Create a Result-based GitTagManager for explicit error handling
- */
 export function createGitTagManagerWithResult(git: GitWrapper): GitTagManagerResult {
   return new GitTagManagerResult(git)
 }

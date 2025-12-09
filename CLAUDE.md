@@ -26,7 +26,6 @@ npm run format
 - **NEVER skip this step** - always format before creating changeset
 - Prevents workflow failures and saves debugging time
 
-**Note**: If Prettier is not yet configured, skip this step (but add it to the TODO list).
 
 ### Step 0b: Run Tests (CRITICAL - DO THIS BEFORE PUSHING!)
 ```bash
@@ -228,23 +227,17 @@ See [.planning/README.md](.planning/README.md) for full details.
   - Command parsing and execution tests (96+ tests)
 
 ### Code Quality
-⚠️ **Current State**: No linting/formatting configured yet
-- **TODO**: ESLint setup needed
-- **TODO**: Prettier configuration needed
-- TypeScript strict mode IS enabled (`tsconfig.json`)
+- ESLint configured with TypeScript rules
+- Prettier configured for consistent formatting
+- TypeScript strict mode enabled (`tsconfig.json`)
 
 ### Pre-Commit Checklist
 **Before committing and pushing code, ALWAYS run:**
 ```bash
 npm run build         # Build TypeScript
-npm run typecheck     # Check TypeScript types (if available)
-npm test              # Run all tests (160 tests)
-```
-
-**Note:** Once ESLint/Prettier are configured, also run:
-```bash
+npm run typecheck     # Check TypeScript types
+npm test              # Run all tests (208 tests)
 npm run format        # Auto-fix formatting issues
-npm run format:check  # Verify formatting is correct
 npm run lint          # Check code quality
 ```
 
@@ -956,7 +949,9 @@ edgit commit -m "manual message"
   run: edgit tag create my-component v${{ github.run_number }}.0.0
 
 - name: Deploy to staging
-  run: edgit deploy set my-component v${{ github.run_number }}.0.0 --to staging
+  run: |
+    edgit tag set my-component staging v${{ github.run_number }}.0.0
+    edgit push --tags --force
 ```
 
 ### Git Hooks

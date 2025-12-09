@@ -26,8 +26,8 @@ describe('edgit tag', () => {
     expect(result.exitCode).toBe(0)
 
     const tags = await repo.listTags()
-    // Tags now use type-specific namespaces: prompts/ for prompt components
-    expect(tags).toContain('prompts/test-prompt/v1.0.0')
+    // Tags use 4-level format: {prefix}/{type}/{name}/{slot}
+    expect(tags).toContain('components/prompts/test-prompt/v1.0.0')
   })
 
   it('should fail if version tag already exists', async () => {
@@ -54,9 +54,9 @@ describe('edgit tag', () => {
     expect(result.exitCode).toBe(0)
 
     const tags = await repo.listTags()
-    // Tags now use type-specific namespaces: prompts/ for prompt components
-    expect(tags).toContain('prompts/test-prompt/v1.0.0')
-    expect(tags).toContain('prompts/test-prompt/v2.0.0')
+    // Tags use 4-level format: {prefix}/{type}/{name}/{slot}
+    expect(tags).toContain('components/prompts/test-prompt/v1.0.0')
+    expect(tags).toContain('components/prompts/test-prompt/v2.0.0')
   })
 
   it('should list tags for a component', async () => {
@@ -70,5 +70,15 @@ describe('edgit tag', () => {
     expect(result.exitCode).toBe(0)
     expect(result.stdout).toContain('v1.0.0')
     expect(result.stdout).toContain('v1.1.0')
+  })
+
+  it('should create environment tag with set command', async () => {
+    await repo.runEdgit(['tag', 'create', 'test-prompt', 'v1.0.0'])
+    const result = await repo.runEdgit(['tag', 'set', 'test-prompt', 'staging', 'v1.0.0'])
+
+    expect(result.exitCode).toBe(0)
+
+    const tags = await repo.listTags()
+    expect(tags).toContain('components/prompts/test-prompt/staging')
   })
 })
