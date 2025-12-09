@@ -550,7 +550,7 @@ export class TagCommand extends Command {
     const versionTags = allTags
       .filter((t) => t.slotType === 'version')
       .map((t) => t.slot)
-      .sort(this.compareSemver)
+      .sort((a, b) => this.compareSemver(a, b))
 
     if (versionTags.length === 0) {
       throw new EdgitError(
@@ -636,8 +636,6 @@ export class TagCommand extends Command {
         }
         // New prerelease: v1.2.3 → v1.2.4-0
         return `v${major}.${minor}.${patch + 1}-0`
-      default:
-        throw new EdgitError('VALIDATION_ERROR', `Unknown bump type: ${bumpType}`)
     }
   }
 
