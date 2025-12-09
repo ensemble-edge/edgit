@@ -167,6 +167,7 @@ ${colors.bold('COMPONENT MANAGEMENT:')}
 
 ${colors.bold('GIT TAG-BASED VERSIONING:')}
   tag create <comp> <version>  Create immutable version tag (v1.0.0)
+  tag bump <comp> <level>      Bump version (major|minor|patch|prerelease)
   tag set <comp> <env> [ref]   Set/move environment tag (staging, production)
   tag list [component]         List tags for component(s)
   tag show <comp>@<tag>        Show detailed tag information
@@ -193,6 +194,7 @@ ${colors.bold('EXAMPLES:')}
 
   ${colors.dim('# Git tag versioning')}
   ${colors.accent('edgit tag create extraction-prompt v1.0.0')}    ${colors.dim('# Create version')}
+  ${colors.accent('edgit tag bump extraction-prompt patch')}       ${colors.dim('# Bump: v1.0.0 → v1.0.1')}
   ${colors.accent('edgit tag set extraction-prompt staging v1.0.0')}  ${colors.dim('# Deploy to staging')}
   ${colors.accent('edgit push --tags --force')}                    ${colors.dim('# Push env tags')}
   ${colors.accent('edgit tag list extraction-prompt')}             ${colors.dim('# List all tags')}
