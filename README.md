@@ -171,6 +171,16 @@ Edge deployment makes this 100x more critical:
 
 **Your AI system deserves multiverse navigation too.**
 
+## Core Philosophy
+
+**Edgit creates and manages git tags. That's it.**
+
+- `edgit tag create` → Creates immutable version tags (v1.0.0, v2.1.3)
+- `edgit tag set` → Creates/moves mutable environment tags (prod, staging, dev)
+- `edgit push --tags --force` → Pushes mutable environment tags to remote
+
+**GitHub Actions handles deployment.** Edgit is pure Git tag management - no deployment logic, no environment-specific code. Your CI/CD watches for tag pushes and deploys accordingly.
+
 ## Features
 
 - 🏷️ **Git tag-based versioning** - All versions stored as native Git tags
@@ -179,7 +189,7 @@ Edge deployment makes this 100x more critical:
 - 🤖 **AI-powered commit messages** - OpenAI integration for intelligent commit descriptions
 - 📦 **Independent component versions** - Version and deploy components separately
 - 🎭 **TypeScript ensemble support** - Version TypeScript workflow definitions alongside YAML
-- 🚀 **Deployment tag management** - Moveable tags for staging, prod, etc.
+- 🚀 **Environment tag management** - Moveable tags for staging, prod, etc. (push with --force)
 - ⚡ **Native Git performance** - Zero overhead, pure Git operations
 - 🔒 **Immutable version history** - Git tags preserve all versions forever
 
@@ -212,8 +222,9 @@ edgit components add welcome-email templates/email/welcome.html template
 # Version it
 edgit tag create welcome-email v1.0.0
 
-# Deploy to Cloudflare KV (used by Conductor)
-edgit deploy set welcome-email v1.0.0 --to production
+# Deploy to production environment
+edgit tag set welcome-email production v1.0.0
+edgit push --tags --force
 
 # A/B test new version
 edgit tag create welcome-email v2.0.0
@@ -247,12 +258,14 @@ edgit components add company-analysis prompts/company-analysis.md prompt
 # Version it
 edgit tag create company-analysis v1.0.0
 
-# Deploy to edge
-edgit deploy set company-analysis v1.0.0 --to production
+# Deploy to production environment
+edgit tag set company-analysis production v1.0.0
+edgit push --tags --force
 
 # Iterate rapidly - update prompt without redeploying code
 edgit tag create company-analysis v1.1.0
-edgit deploy set company-analysis v1.1.0 --to production
+edgit tag set company-analysis production v1.1.0
+edgit push --tags --force
 ```
 
 ### Ensembles in Conductor
@@ -280,8 +293,9 @@ edgit components add company-intel ensembles/company-intel.ts ensemble
 # Version it
 edgit tag create company-intel v1.0.0
 
-# Deploy to edge
-edgit deploy set company-intel v1.0.0 --to production
+# Deploy to production environment
+edgit tag set company-intel production v1.0.0
+edgit push --tags --force
 
 # A/B test versions - old YAML vs new TypeScript
 # ensemble://company-intel@v1.0.0 (YAML)
@@ -363,7 +377,8 @@ edgit tag create helper-prompt v1.0.0
 # Creates Git tag: components/helper-prompt/v1.0.0
 
 # Deploy to production reality
-edgit deploy set helper-prompt v1.0.0 --to prod
+edgit tag set helper-prompt prod v1.0.0
+edgit push --tags --force
 # Creates/moves Git tag: components/helper-prompt/prod → v1.0.0
 
 # Navigate the multiverse - see all versions
@@ -371,9 +386,9 @@ edgit tag list helper-prompt
 # v1.0.0  (Portal created: 2024-10-31, SHA: abc1234)
 
 # See which reality is deployed where
-edgit deploy status helper-prompt
-# prod:    v1.0.0 (this reality)
-# staging: (exploring other possibilities)
+edgit components list helper-prompt
+# helper-prompt (prompt)
+# └── v1.0.0 [prod]  ← Your component is deployed!
 
 # Or see everything at once with components list
 edgit components list --format tree
@@ -414,11 +429,14 @@ components/<component-name>/<version>
 components/helper-prompt/v1.0.0    ← Portal to the perfect prompt reality
 components/data-agent/v2.1.3       ← Portal to the stable agent timeline
 
-# Deployment portals (moveable - can point to different realities) 
+# Environment portals (moveable - can point to different realities)
 components/<component-name>/<environment>
 components/helper-prompt/prod      → currently points to v1.0.0 reality
-components/helper-prompt/staging   → exploring v1.1.0-beta timeline  
+components/helper-prompt/staging   → exploring v1.1.0-beta timeline
 components/data-agent/prod         → locked into v2.1.3 stable reality
+
+# Set with: edgit tag set <component> <env> <version>
+# Push with: edgit push --tags --force
 ```
 
 ### Component Discovery Across the Multiverse
@@ -503,7 +521,8 @@ git push
 
 # Add Edgit multiverse navigation when ready
 edgit tag create my-prompt v1.0.0    # Create immutable portal
-edgit deploy set my-prompt v1.0.0 --to prod  # Deploy to production reality
+edgit tag set my-prompt prod v1.0.0  # Set production environment tag
+edgit push --tags --force            # Push mutable environment tags
 
 # All portals live in Git tags - zero files touched, zero conflicts
 ```
@@ -521,20 +540,27 @@ edgit components list [options]     # List components with version info
 edgit components show <component>   # Show component details
 
 # Version management
-edgit tag create <component> <version>    # Create version tag
+edgit tag create <component> <version>    # Create immutable version tag
+edgit tag set <component> <env> [ref]     # Set mutable environment tag
 edgit tag list [component]                # List versions
-edgit tag show <component> <version>      # Show version details
-edgit tag delete <component> <version>    # Delete version
+edgit tag show <component>@<version>      # Show version details
+edgit tag delete <component>@<version>    # Delete version
 
-# Deployment management
-edgit deploy set <component> <version> --to <env>  # Deploy version
-edgit deploy status [component]                    # Show deployments
-edgit deploy list                                  # List all deployments
-edgit deploy promote <component> <from> <to>       # Promote between envs
+# Push tags (important!)
+edgit push --tags                         # Push version tags
+edgit push --tags --force                 # Push environment tags (mutable)
 
 # Commit assistance (optional)
 edgit commit [-m message]           # AI-assisted or manual commit
 ```
+
+### The Philosophy: Tags Only
+
+**Edgit creates and manages git tags. That's it.** GitHub Actions handles deployment.
+
+- `edgit tag create` → Creates immutable version tags (v1.0.0, v2.1.3)
+- `edgit tag set` → Creates/moves mutable environment tags (prod, staging, dev)
+- `edgit push --tags --force` → Pushes mutable tags (required for environment tags)
 
 ### Component Listing: Navigate Your Multiverse
 
@@ -780,15 +806,6 @@ edgit commit -m "your custom message"
 - **Component scope detection**: Automatically identifies affected components
 - **Fallback gracefully**: Works without API key (manual mode)
 
-### Legacy Commands (Deprecated)
-
-These commands now provide migration guidance:
-```bash
-edgit history    # → Use: edgit tag list <component>
-edgit register   # → Use: edgit init --force  
-edgit resync     # → Use: edgit init --force
-```
-
 ## Requirements
 
 - **Node.js** 18+ 
@@ -796,31 +813,6 @@ edgit resync     # → Use: edgit init --force
 - Works with any Git repository
 
 *Note: Global npm installation now works correctly with built JavaScript files.*
-
-## Migration from Legacy Versions
-
-If you're upgrading from a pre-Git-tag version of Edgit:
-
-```bash
-# Your old component registry is preserved  
-# but versions now live in Git tags
-
-# Reinitialize to discover components
-edgit init --force
-
-# Create tags for your existing components
-edgit tag create my-component v1.0.0
-
-# Deploy using the new tag system
-edgit deploy set my-component v1.0.0 --to prod
-```
-
-**Benefits of Migration:**
-- ✅ Zero merge conflicts going forward
-- ✅ Better performance (no JSON parsing)
-- ✅ Native Git operations
-- ✅ Immutable version history
-- ✅ Easier debugging and inspection
 
 ## Technical Details
 
@@ -838,8 +830,8 @@ Edgit provides comprehensive error handling with actionable guidance:
 ❌ Version tag already exists: components/my-component/v1.0.0
    Use --force to overwrite or choose a different version
 
-# Deployment validation
-❌ Cannot deploy: version v2.0.0 does not exist for component "my-component"
+# Tag validation
+❌ Cannot set environment tag: version v2.0.0 does not exist for component "my-component"
    Available versions: v1.0.0, v1.1.0
    Create version first: edgit tag create my-component v2.0.0
 ```
@@ -938,7 +930,7 @@ DEBUG=true edgit commit
 
 ### Git Tag Management
 
-**Problem**: Deployment showing wrong versions
+**Problem**: Environment tag showing wrong version
 ```bash
 # Check what tags actually exist
 git tag -l "components/*"
@@ -946,8 +938,9 @@ git tag -l "components/*"
 # Verify tag points to expected commit
 git show components/my-component/v1.0.0
 
-# Fix deployment tag if needed
-edgit deploy set my-component v1.0.0 --to prod
+# Fix environment tag if needed
+edgit tag set my-component prod v1.0.0
+edgit push --tags --force
 ```
 
 ### Performance Issues
@@ -986,12 +979,15 @@ components/{component-name}/{semantic-version}
 - Must follow semver: v1.0.0, v2.1.3-beta, etc.
 - Immutable once created
 - Points to specific Git SHA
+- Created with: edgit tag create <component> <version>
 
-# Deployment tags (moveable)
-components/{component-name}/{environment-name}  
+# Environment tags (moveable)
+components/{component-name}/{environment-name}
 - Can be any environment name: prod, staging, dev, etc.
 - Moveable - can point to different versions
 - Atomic updates via Git tag operations
+- Created with: edgit tag set <component> <env> [ref]
+- Must be pushed with --force: edgit push --tags --force
 ```
 
 ### Implementation Notes
@@ -1015,12 +1011,14 @@ edgit commit                        # Optional AI commit
 git flow feature finish new-prompt  
 edgit tag create my-prompt v1.1.0   # Version when ready
 
-# Works with GitHub/GitLab workflows  
+# Works with GitHub/GitLab workflows
 git checkout -b feature/new-agent
 # ... edit files ...
 git push origin feature/new-agent
 # ... merge PR ...
 edgit tag create my-agent v2.0.0    # Version on main
+edgit tag set my-agent prod v2.0.0  # Set production environment
+edgit push --tags --force           # Push mutable environment tags
 ```
 
 ## Documentation

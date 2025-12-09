@@ -73,10 +73,10 @@ edgit/
 │   └── types/                   # TypeScript type definitions
 │       └── ai-commit.ts        # AI-related types
 ├── dist/                        # Compiled JavaScript (gitignored)
-├── tests/                       # Tests (TODO: not yet implemented)
+├── tests/                       # Unit and integration tests (Vitest)
 ├── .edgit/                      # Example edgit metadata
 ├── docs/                        # Documentation
-├── examples/                    # Usage examples (TODO)
+├── examples/                    # Usage examples
 ├── tsconfig.json               # TypeScript configuration
 ├── package.json                # Project metadata & scripts
 ├── CLAUDE.md                   # AI assistant guidance
@@ -181,9 +181,7 @@ import { Component } from '../models/components.js';
 
 #### 3. Add Tests
 
-⚠️ **Current State**: Test infrastructure not yet set up
-
-Once tests are configured:
+Add tests for new functionality using Vitest:
 ```typescript
 // tests/unit/utils/component-detector.test.ts
 import { describe, it, expect } from 'vitest';
@@ -261,44 +259,35 @@ The project uses strict TypeScript settings:
 }
 ```
 
-### Planned Linting (TODO)
+### Linting
 
-Once ESLint is configured:
+ESLint is configured with TypeScript rules:
 ```bash
 npm run lint        # Check for issues
 npm run lint:fix    # Auto-fix issues
 ```
 
-**Rules to follow manually until then:**
-- No unused variables
-- No console.log in production code (use console.error for errors)
-- Consistent naming: camelCase for variables/functions, PascalCase for classes
-- No magic numbers - use constants
-- Keep functions focused and small (<50 lines ideal)
+### Formatting
 
-### Planned Formatting (TODO)
-
-Once Prettier is configured:
+Prettier is configured for consistent code style:
 ```bash
 npm run format      # Format all files
+npm run format:check # Check formatting without changes
 ```
 
-**Style to follow manually:**
+**Style enforced:**
 - 2 spaces for indentation
 - Single quotes for strings
-- No semicolons (TypeScript convention)
+- No semicolons
 - Trailing commas in multiline
 
 ## Testing
 
-### Current State
-⚠️ **Tests not yet implemented**
+### Test Infrastructure
 
-The project currently has no test infrastructure. This is a high-priority item.
+The project uses Vitest with 208+ tests covering unit and integration scenarios.
 
-### Planned Test Strategy
-
-#### Test Structure
+### Test Structure
 ```
 tests/
 ├── unit/                        # Pure function tests
@@ -306,34 +295,29 @@ tests/
 │   │   ├── component-detector.test.ts
 │   │   ├── git-tags.test.ts
 │   │   └── ...
-│   └── models/
-│       └── components.test.ts
+│   └── validation/
+│       └── schemas.test.ts
 ├── integration/                 # Command end-to-end tests
 │   ├── init.test.ts
 │   ├── tag.test.ts
 │   ├── deploy.test.ts
-│   └── ...
+│   └── components-list-enhanced.test.ts
 ├── fixtures/                    # Test data
-│   ├── sample-repos/
 │   └── components/
 └── helpers/                     # Test utilities
-    ├── git-test-repo.ts        # Create temp git repos
-    ├── mock-git.ts             # Mock git operations
-    └── assertions.ts           # Custom assertions
+    └── git-test-repo.ts        # Create temp git repos for testing
 ```
 
-#### Running Tests (once implemented)
+### Running Tests
 ```bash
 npm test                 # Run all tests
 npm run test:watch      # Watch mode
 npm run test:coverage   # Generate coverage report
-npm run test:unit       # Unit tests only
-npm run test:integration # Integration tests only
 ```
 
-#### Writing Tests
+### Writing Tests
 
-**Test Framework**: Jest or Vitest (TBD)
+**Test Framework**: Vitest
 
 **Pattern for Unit Tests:**
 ```typescript

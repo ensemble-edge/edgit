@@ -264,11 +264,12 @@ describe('edgit components list - enhanced features', () => {
       await repo.commit('Add component')
       await repo.runEdgit(['init'])
 
-      // Create versions and deployment tags
+      // Create versions and deployment tags using NEW command format
       await repo.runEdgit(['tag', 'create', 'deployed-prompt', 'v1.0.0'])
       await repo.runEdgit(['tag', 'create', 'deployed-prompt', 'v2.0.0'])
-      await repo.runEdgit(['deploy', 'deployed-prompt', 'v1.0.0', '--to', 'prod'])
-      await repo.runEdgit(['deploy', 'deployed-prompt', 'v2.0.0', '--to', 'staging'])
+      // NEW: edgit tag set <component> <env> <version>
+      await repo.runEdgit(['tag', 'set', 'deployed-prompt', 'prod', 'v1.0.0'])
+      await repo.runEdgit(['tag', 'set', 'deployed-prompt', 'staging', 'v2.0.0'])
     })
 
     it('should show deployment tags in JSON format', async () => {
@@ -278,9 +279,9 @@ describe('edgit components list - enhanced features', () => {
       const output = parseJSONOutput(result.stdout)
       const component = output.find((c: any) => c.name === 'deployed-prompt')
 
-      expect(component.deploymentTags).toBeDefined()
-      expect(component.deploymentTags).toContain('prod')
-      expect(component.deploymentTags).toContain('staging')
+      expect(component.environmentTags).toBeDefined()
+      expect(component.environmentTags).toContain('prod')
+      expect(component.environmentTags).toContain('staging')
     })
 
     it('should show deployment tags in table format', async () => {

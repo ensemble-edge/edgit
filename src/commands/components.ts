@@ -2,7 +2,7 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import { Command } from './base.js'
 import { GitWrapper } from '../utils/git.js'
-import type { GitTagManager, EntityType } from '../utils/git-tags.js'
+import type { GitTagManager, EntityType, TagPrefix } from '../utils/git-tags.js'
 import { createGitTagManager } from '../utils/git-tags.js'
 import type { ComponentRegistry, ComponentType, Component } from '../models/components.js'
 import { ComponentUtils, ComponentSpec, ComponentSpecParser } from '../models/components.js'
@@ -28,6 +28,32 @@ function componentTypeToEntityType(componentType: ComponentType): EntityType {
   }
   // All other types map directly
   return componentType as EntityType
+}
+
+/**
+ * Infer TagPrefix from file path
+ * Determines if a component should be tagged under 'components' or 'logic'
+ *
+ * Rules:
+ * - 'logic' prefix: Files in logic/, src/logic/, or containing 'worker', 'handler', 'router'
+ * - 'components' prefix: Everything else (prompts, configs, etc.)
+ */
+function inferPrefixFromPath(filePath: string): TagPrefix {
+  const normalizedPath = filePath.toLowerCase()
+
+  // Logic prefix indicators
+  if (
+    normalizedPath.includes('logic/') ||
+    normalizedPath.includes('src/logic/') ||
+    normalizedPath.includes('worker') ||
+    normalizedPath.includes('handler') ||
+    normalizedPath.includes('router')
+  ) {
+    return 'logic'
+  }
+
+  // Default to components for prompts, configs, etc.
+  return 'components'
 }
 
 /**
@@ -160,7 +186,8 @@ export class ComponentsCommand extends Command {
       const entriesWithTags = []
       for (const entry of componentEntries) {
         const entityType = componentTypeToEntityType(entry.component.type)
-        const tags = await this.tagManager.listTags(entry.name, entityType)
+        const prefix = inferPrefixFromPath(entry.component.path)
+        const tags = await this.tagManager.listTags(prefix, entityType, entry.name)
         if (tags.length > 0) {
           entriesWithTags.push(entry)
         }
@@ -319,25 +346,28 @@ export class ComponentsCommand extends Command {
       type: ComponentType
       path: string
       versions: string[]
-      deploymentTags: string[]
+      environmentTags: string[]
       versionCount: number
     }> = []
 
     for (const { name, component } of componentEntries) {
       const entityType = componentTypeToEntityType(component.type)
-      const versionTags = await this.tagManager.getVersionTags(name, entityType)
-      const deploymentTags = await this.tagManager.getDeploymentTags(name, entityType)
+      const prefix = inferPrefixFromPath(component.path)
+      const versionTagsInfo = await this.tagManager.getVersionTags(prefix, entityType, name)
+      const environmentTagsInfo = await this.tagManager.getEnvironmentTags(prefix, entityType, name)
 
-      // Apply limit
-      const versions = limit ? versionTags.slice(-limit) : versionTags
+      // Apply limit and extract slot names
+      const limitedVersions = limit ? versionTagsInfo.slice(-limit) : versionTagsInfo
+      const versions = limitedVersions.map((tag) => tag.slot)
+      const environmentTags = environmentTagsInfo.map((tag) => tag.slot)
 
       output.push({
         name,
         type: component.type,
         path: component.path,
         versions,
-        deploymentTags,
-        versionCount: versionTags.length,
+        environmentTags,
+        versionCount: versionTagsInfo.length,
       })
     }
 
@@ -355,11 +385,14 @@ export class ComponentsCommand extends Command {
 
     for (const { name, component } of componentEntries) {
       const entityType = componentTypeToEntityType(component.type)
-      const versionTags = await this.tagManager.getVersionTags(name, entityType)
-      const deploymentTags = await this.tagManager.getDeploymentTags(name, entityType)
+      const prefix = inferPrefixFromPath(component.path)
+      const versionTagsInfo = await this.tagManager.getVersionTags(prefix, entityType, name)
+      const environmentTagsInfo = await this.tagManager.getEnvironmentTags(prefix, entityType, name)
 
-      // Apply limit
-      const versions = limit ? versionTags.slice(-limit) : versionTags
+      // Apply limit and extract slot names
+      const limitedVersions = limit ? versionTagsInfo.slice(-limit) : versionTagsInfo
+      const versions = limitedVersions.map((tag) => tag.slot)
+      const environmentTags = environmentTagsInfo.map((tag) => tag.slot)
 
       console.log(`  - name: ${name}`)
       console.log(`    type: ${component.type}`)
@@ -368,9 +401,9 @@ export class ComponentsCommand extends Command {
       for (const version of versions) {
         console.log(`      - ${version}`)
       }
-      if (deploymentTags.length > 0) {
-        console.log('    deploymentTags:')
-        for (const tag of deploymentTags) {
+      if (environmentTags.length > 0) {
+        console.log('    environmentTags:')
+        for (const tag of environmentTags) {
           console.log(`      - ${tag}`)
         }
       }
@@ -409,22 +442,30 @@ export class ComponentsCommand extends Command {
         const isLastComp = compIdx === components.length - 1
 
         const entityType = componentTypeToEntityType(component.type)
-        const versionTags = await this.tagManager.getVersionTags(name, entityType)
-        const deploymentTags = await this.tagManager.getDeploymentTags(name, entityType)
+        const prefix = inferPrefixFromPath(component.path)
+        const versionTagsInfo = await this.tagManager.getVersionTags(prefix, entityType, name)
+        const environmentTagsInfo = await this.tagManager.getEnvironmentTags(
+          prefix,
+          entityType,
+          name
+        )
 
         // Apply limit
-        const versions = limit ? versionTags.slice(-limit) : versionTags
+        const limitedVersions = limit ? versionTagsInfo.slice(-limit) : versionTagsInfo
 
-        const prefix = isLastType ? '   ' : '│  '
-        console.log(`${prefix}${isLastComp ? '└─' : '├─'} ${name}`)
+        const prefix_str = isLastType ? '   ' : '│  '
+        console.log(`${prefix_str}${isLastComp ? '└─' : '├─'} ${name}`)
 
         // Show versions
-        for (let verIdx = 0; verIdx < versions.length; verIdx++) {
-          const version = versions[verIdx]!
-          const isLastVer = verIdx === versions.length - 1 && deploymentTags.length === 0
+        for (let verIdx = 0; verIdx < limitedVersions.length; verIdx++) {
+          const versionInfo = limitedVersions[verIdx]!
+          const isLastVer =
+            verIdx === limitedVersions.length - 1 && environmentTagsInfo.length === 0
 
           try {
-            const tagInfo = await this.tagManager.getTagInfo(name, version, entityType)
+            const gitTag = this.tagManager.buildTagPath(prefix, entityType, name, versionInfo.slot)
+            const tagInfo = await this.tagManager.getTagInfo(gitTag)
+
             // Handle invalid dates gracefully
             let date = 'unknown'
             if (tagInfo.date) {
@@ -439,22 +480,27 @@ export class ComponentsCommand extends Command {
             }
             const sha = tagInfo.sha.substring(0, 8)
 
-            // Check if any deployment tag points here
+            // Check if any environment tag points here
             const deployedAs: string[] = []
-            for (const depTag of deploymentTags) {
+            for (const envTagInfo of environmentTagsInfo) {
               try {
-                const depSHA = await this.tagManager.getTagSHA(name, depTag, entityType)
+                const envSHA = await this.tagManager.getTagSHA(
+                  prefix,
+                  entityType,
+                  name,
+                  envTagInfo.slot
+                )
                 if (process.env.DEBUG) {
                   console.error(
-                    `  [DEBUG] Comparing: version ${version} SHA=${tagInfo.sha} vs ${depTag} SHA=${depSHA}`
+                    `  [DEBUG] Comparing: version ${versionInfo.slot} SHA=${tagInfo.sha} vs ${envTagInfo.slot} SHA=${envSHA}`
                   )
                 }
-                if (depSHA === tagInfo.sha) {
-                  deployedAs.push(depTag)
+                if (envSHA === tagInfo.sha) {
+                  deployedAs.push(envTagInfo.slot)
                 }
               } catch (error) {
                 if (process.env.DEBUG) {
-                  console.error(`  [DEBUG] Error getting SHA for ${depTag}:`, error)
+                  console.error(`  [DEBUG] Error getting SHA for ${envTagInfo.slot}:`, error)
                 }
               }
             }
@@ -462,15 +508,15 @@ export class ComponentsCommand extends Command {
             const deployBadge = deployedAs.length > 0 ? ` ← ${deployedAs.join(', ')}` : ''
             const innerPrefix = isLastComp ? '      ' : '│     '
             console.log(
-              `${prefix}${innerPrefix}${isLastVer ? '└─' : '├─'} ${version} (${sha}, ${date})${deployBadge}`
+              `${prefix_str}${innerPrefix}${isLastVer ? '└─' : '├─'} ${versionInfo.slot} (${sha}, ${date})${deployBadge}`
             )
           } catch (error) {
             // If getTagInfo fails, show version without metadata
             const innerPrefix = isLastComp ? '      ' : '│     '
-            console.log(`${prefix}${innerPrefix}${isLastVer ? '└─' : '├─'} ${version}`)
+            console.log(`${prefix_str}${innerPrefix}${isLastVer ? '└─' : '├─'} ${versionInfo.slot}`)
             // Debug: Log error to help diagnose issues
             if (process.env.DEBUG) {
-              console.error(`  [DEBUG] Error getting tag info for ${version}:`, error)
+              console.error(`  [DEBUG] Error getting tag info for ${versionInfo.slot}:`, error)
             }
           }
         }
@@ -498,46 +544,68 @@ export class ComponentsCommand extends Command {
     console.log(`Type: ${component.type}`)
 
     const entityType = componentTypeToEntityType(component.type)
+    const prefix = inferPrefixFromPath(component.path)
 
     try {
       // Get all tags for this component
-      const allTags = await this.tagManager.listTags(componentName, entityType)
-      const versionTags = await this.tagManager.getVersionTags(componentName, entityType)
-      const deploymentTags = await this.tagManager.getDeploymentTags(componentName, entityType)
+      const allTagsInfo = await this.tagManager.listTags(prefix, entityType, componentName)
+      const versionTagsInfo = await this.tagManager.getVersionTags(
+        prefix,
+        entityType,
+        componentName
+      )
+      const environmentTagsInfo = await this.tagManager.getEnvironmentTags(
+        prefix,
+        entityType,
+        componentName
+      )
 
       // Show version tags
-      if (versionTags.length > 0) {
+      if (versionTagsInfo.length > 0) {
         console.log('\n🏷️  Version Tags:')
-        for (const version of versionTags) {
+        for (const versionInfo of versionTagsInfo) {
           try {
-            const tagInfo = await this.tagManager.getTagInfo(componentName, version, entityType)
+            const gitTag = this.tagManager.buildTagPath(
+              prefix,
+              entityType,
+              componentName,
+              versionInfo.slot
+            )
+            const tagInfo = await this.tagManager.getTagInfo(gitTag)
             console.log(
-              `   ${version} - ${tagInfo.sha.substring(0, 8)} - ${tagInfo.date} - ${tagInfo.message}`
+              `   ${versionInfo.slot} - ${tagInfo.sha.substring(0, 8)} - ${tagInfo.date} - ${tagInfo.message}`
             )
           } catch {
-            console.log(`   ${version} - (error getting info)`)
+            console.log(`   ${versionInfo.slot} - (error getting info)`)
           }
         }
       }
 
-      // Show deployment tags
-      if (deploymentTags.length > 0) {
-        console.log('\n🚀 Deployment Tags:')
-        for (const env of deploymentTags) {
+      // Show environment tags
+      if (environmentTagsInfo.length > 0) {
+        console.log('\n🚀 Environment Tags:')
+        for (const envInfo of environmentTagsInfo) {
           try {
-            const tagInfo = await this.tagManager.getTagInfo(componentName, env, entityType)
+            const gitTag = this.tagManager.buildTagPath(
+              prefix,
+              entityType,
+              componentName,
+              envInfo.slot
+            )
+            const tagInfo = await this.tagManager.getTagInfo(gitTag)
 
             // Find which version this points to
             let pointsToVersion = 'custom'
-            for (const version of versionTags) {
+            for (const versionInfo of versionTagsInfo) {
               try {
                 const versionSHA = await this.tagManager.getTagSHA(
+                  prefix,
+                  entityType,
                   componentName,
-                  version,
-                  entityType
+                  versionInfo.slot
                 )
                 if (versionSHA === tagInfo.sha) {
-                  pointsToVersion = version
+                  pointsToVersion = versionInfo.slot
                   break
                 }
               } catch {
@@ -546,34 +614,42 @@ export class ComponentsCommand extends Command {
             }
 
             console.log(
-              `   ${env} → ${pointsToVersion} (${tagInfo.sha.substring(0, 8)}) - ${tagInfo.date}`
+              `   ${envInfo.slot} → ${pointsToVersion} (${tagInfo.sha.substring(0, 8)}) - ${tagInfo.date}`
             )
           } catch {
-            console.log(`   ${env} - (error getting info)`)
+            console.log(`   ${envInfo.slot} - (error getting info)`)
           }
         }
       }
 
-      // Show custom tags
-      const customTags = allTags.filter(
-        (tag) => !versionTags.includes(tag) && !deploymentTags.includes(tag)
+      // Show custom tags (tags that are neither version nor environment)
+      const customTagsInfo = allTagsInfo.filter(
+        (tagInfo) =>
+          !versionTagsInfo.some((v) => v.slot === tagInfo.slot) &&
+          !environmentTagsInfo.some((e) => e.slot === tagInfo.slot)
       )
 
-      if (customTags.length > 0) {
+      if (customTagsInfo.length > 0) {
         console.log('\n🏷️  Custom Tags:')
-        for (const tag of customTags) {
+        for (const customInfo of customTagsInfo) {
           try {
-            const tagInfo = await this.tagManager.getTagInfo(componentName, tag)
+            const gitTag = this.tagManager.buildTagPath(
+              prefix,
+              entityType,
+              componentName,
+              customInfo.slot
+            )
+            const tagInfo = await this.tagManager.getTagInfo(gitTag)
             console.log(
-              `   ${tag} - ${tagInfo.sha.substring(0, 8)} - ${tagInfo.date} - ${tagInfo.message}`
+              `   ${customInfo.slot} - ${tagInfo.sha.substring(0, 8)} - ${tagInfo.date} - ${tagInfo.message}`
             )
           } catch {
-            console.log(`   ${tag} - (error getting info)`)
+            console.log(`   ${customInfo.slot} - (error getting info)`)
           }
         }
       }
 
-      if (allTags.length === 0) {
+      if (allTagsInfo.length === 0) {
         console.log('\n⚠️  No tags found for this component')
         console.log(`   Create tags with: edgit tag ${componentName} <tagname>`)
       }
@@ -600,9 +676,11 @@ export class ComponentsCommand extends Command {
 
     console.log('\n💡 Commands:')
     console.log(`   edgit tag ${componentName} v1.0.0          # Create version tag`)
-    console.log(`   edgit tag ${componentName} prod            # Create deployment tag`)
+    console.log(`   edgit tag ${componentName} prod            # Create environment tag`)
     console.log(`   edgit checkout ${componentName}@v1.0.0     # Checkout specific version`)
-    console.log(`   edgit deploy ${componentName} v1.0.0 --to prod # Deploy version`)
+    console.log(
+      `   edgit tag set ${componentName} prod v1.0.0 && edgit push --tags --force # Deploy version`
+    )
   }
 
   /**
@@ -625,7 +703,15 @@ export class ComponentsCommand extends Command {
 
       if (spec.ref) {
         // Checkout specific version/tag/SHA
-        content = await this.tagManager.getFileAtTag(spec.name, spec.ref, component.path)
+        const entityType = componentTypeToEntityType(component.type)
+        const prefix = inferPrefixFromPath(component.path)
+        content = await this.tagManager.getFileAtTag(
+          prefix,
+          entityType,
+          spec.name,
+          spec.ref,
+          component.path
+        )
         console.log(`📦 ${spec.name}@${spec.ref}:`)
       } else {
         // Checkout current version (HEAD)
@@ -713,7 +799,7 @@ export class ComponentsCommand extends Command {
     console.log(`   Type: ${componentType}`)
     console.log('\n💡 Next steps:')
     console.log(`   edgit tag ${name} v1.0.0     # Create first version tag`)
-    console.log(`   edgit tag ${name} prod       # Create deployment tag`)
+    console.log(`   edgit tag ${name} prod       # Create environment tag`)
   }
 
   /**
@@ -733,10 +819,12 @@ export class ComponentsCommand extends Command {
     if (component) {
       try {
         const entityType = componentTypeToEntityType(component.type)
-        const tags = await this.tagManager.listTags(componentName, entityType)
-        if (tags.length > 0 && !flags.force) {
-          console.log(`⚠️  Component '${componentName}' has ${tags.length} Git tags:`)
-          console.log(`   ${tags.join(', ')}`)
+        const prefix = inferPrefixFromPath(component.path)
+        const tagsInfo = await this.tagManager.listTags(prefix, entityType, componentName)
+        if (tagsInfo.length > 0 && !flags.force) {
+          const tagSlots = tagsInfo.map((t) => t.slot)
+          console.log(`⚠️  Component '${componentName}' has ${tagsInfo.length} Git tags:`)
+          console.log(`   ${tagSlots.join(', ')}`)
           console.log('\n   Use --force to remove anyway (Git tags will remain)')
           console.log('   Or manually delete tags first with: edgit tag delete <component>@<tag>')
           return
@@ -765,15 +853,17 @@ export class ComponentsCommand extends Command {
   ): Promise<void> {
     try {
       const entityType = componentTypeToEntityType(component.type)
-      const allVersionTags = await this.tagManager.getVersionTags(name, entityType)
-      const deploymentTags = await this.tagManager.getDeploymentTags(name, entityType)
+      const prefix = inferPrefixFromPath(component.path)
+      const allVersionTagsInfo = await this.tagManager.getVersionTags(prefix, entityType, name)
+      const environmentTagsInfo = await this.tagManager.getEnvironmentTags(prefix, entityType, name)
 
       // Apply limit if specified
-      const versionTags = limit && limit > 0 ? allVersionTags.slice(-limit) : allVersionTags
+      const limitedVersionTagsInfo =
+        limit && limit > 0 ? allVersionTagsInfo.slice(-limit) : allVersionTagsInfo
 
       let latestVersion = 'none'
-      if (allVersionTags.length > 0) {
-        latestVersion = allVersionTags[allVersionTags.length - 1] || 'none'
+      if (allVersionTagsInfo.length > 0) {
+        latestVersion = allVersionTagsInfo[allVersionTagsInfo.length - 1]?.slot || 'none'
       }
 
       if (verbose) {
@@ -782,17 +872,19 @@ export class ComponentsCommand extends Command {
         console.log(`   Path: ${component.path}`)
         console.log(`   Latest: ${latestVersion}`)
         console.log(
-          `   Versions: ${allVersionTags.length}${limit ? ` (showing ${versionTags.length})` : ''}`
+          `   Versions: ${allVersionTagsInfo.length}${limit ? ` (showing ${limitedVersionTagsInfo.length})` : ''}`
         )
 
-        if (deploymentTags.length > 0) {
-          console.log(`   Deployments: ${deploymentTags.join(', ')}`)
+        if (environmentTagsInfo.length > 0) {
+          const envSlots = environmentTagsInfo.map((t) => t.slot)
+          console.log(`   Environments: ${envSlots.join(', ')}`)
         }
       } else {
-        const deployInfo = deploymentTags.length > 0 ? ` [${deploymentTags.join(',')}]` : ''
-        const limitInfo = limit && allVersionTags.length > limit ? ` (showing ${limit})` : ''
+        const envSlots = environmentTagsInfo.map((t) => t.slot)
+        const deployInfo = envSlots.length > 0 ? ` [${envSlots.join(',')}]` : ''
+        const limitInfo = limit && allVersionTagsInfo.length > limit ? ` (showing ${limit})` : ''
         console.log(
-          `   📦 ${name}: ${latestVersion} (${allVersionTags.length} versions${limitInfo})${deployInfo}`
+          `   📦 ${name}: ${latestVersion} (${allVersionTagsInfo.length} versions${limitInfo})${deployInfo}`
         )
       }
     } catch (error) {
@@ -866,7 +958,7 @@ SUBCOMMANDS:
 COMPONENT SPECIFICATIONS:
   component-name                    Show current version
   component-name@v1.0.0            Show specific version tag
-  component-name@prod               Show deployment tag
+  component-name@prod               Show environment tag
   component-name@abc123             Show specific SHA
 
 COMPONENT TYPES:
@@ -902,11 +994,18 @@ EXAMPLES:
 INTEGRATION:
   This command works with Git tags created by:
   - edgit tag <component> <version>         # Create version tags
-  - edgit deploy <component> <version> --to <env> # Create deployment tags
+  - edgit tag set <component> <env> <version>  # Set environment tag
+  - edgit push --tags --force                 # Push to remote
 
 NOTE:
   Components are stored in .edgit/components.json as a minimal manifest.
   All versioning information comes from Git tags, not the registry file.
+
+  Tag Prefix Logic:
+  - 'components' prefix: Prompts, configs, etc. (syncs to KV on push)
+  - 'logic' prefix: Workers, handlers, routers (triggers rebuild on push)
+
+  The prefix is automatically inferred from the component's file path.
 `
   }
 }

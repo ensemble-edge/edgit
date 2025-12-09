@@ -26,7 +26,7 @@ export class HistoryCommand extends Command {
 ALTERNATIVES:
    edgit tag list <component>           # List component versions
    edgit tag show <component> <version> # Show version details
-   edgit deploy status <component>      # Show deployment history
+   edgit components list --format tree  # Show all components and their deployments
 `
   }
 }

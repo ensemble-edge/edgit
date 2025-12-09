@@ -10,90 +10,101 @@ describe('GitTagManagerResult', () => {
     mockGit = {
       exec: vi.fn(),
     } as unknown as GitWrapper
-
     tagManager = createGitTagManagerWithResult(mockGit)
   })
 
-  describe('createTag', () => {
+  describe('createVersionTag', () => {
     it('should return ok result for successful tag creation', async () => {
-      vi.mocked(mockGit.exec).mockResolvedValue({
-        stdout: '',
-        stderr: '',
-        exitCode: 0,
-      })
+      vi.mocked(mockGit.exec)
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // exists check
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // create
 
-      const result = await tagManager.createTag('my-prompt', 'v1.0.0', 'prompt')
+      const result = await tagManager.createVersionTag('components', 'prompt', 'extraction', 'v1.0.0')
 
       expect(result.ok).toBe(true)
       if (result.ok) {
-        expect(result.value).toBe('prompts/my-prompt/v1.0.0')
+        expect(result.value).toBe('components/prompts/extraction/v1.0.0')
       }
     })
 
-    it('should return error result for tag that already exists', async () => {
-      vi.mocked(mockGit.exec).mockResolvedValue({
-        stdout: '',
-        stderr: 'fatal: tag already exists',
-        exitCode: 1,
+    it('should return error for existing version tag', async () => {
+      vi.mocked(mockGit.exec).mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: 'components/prompts/extraction/v1.0.0',
+        stderr: '',
       })
 
-      const result = await tagManager.createTag('my-prompt', 'v1.0.0', 'prompt')
+      const result = await tagManager.createVersionTag('components', 'prompt', 'extraction', 'v1.0.0')
 
       expect(result.ok).toBe(false)
       if (!result.ok) {
         expect(result.error.kind).toBe('tag_exists')
+      }
+    })
+
+    it('should return error for invalid version', async () => {
+      const result = await tagManager.createVersionTag('components', 'prompt', 'extraction', 'invalid')
+
+      expect(result.ok).toBe(false)
+      if (!result.ok) {
+        expect(result.error.kind).toBe('invalid_version')
       }
     })
   })
 
-  describe('createVersionTag', () => {
-    it('should return error for existing version tag', async () => {
-      // First call checks if tag exists (returns 0 meaning it exists)
-      vi.mocked(mockGit.exec).mockResolvedValueOnce({
-        stdout: 'abc123',
-        stderr: '',
-        exitCode: 0,
-      })
+  describe('setEnvironmentTag', () => {
+    it('should return ok result for successful tag creation', async () => {
+      vi.mocked(mockGit.exec)
+        .mockResolvedValueOnce({ exitCode: 0, stdout: 'abc123', stderr: '' }) // resolve ref
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // delete existing
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // create
 
-      const result = await tagManager.createVersionTag('my-prompt', 'v1.0.0', 'prompt')
+      const result = await tagManager.setEnvironmentTag('components', 'prompt', 'extraction', 'staging')
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.value).toBe('components/prompts/extraction/staging')
+      }
+    })
+
+    it('should return error for version-like environment', async () => {
+      const result = await tagManager.setEnvironmentTag('components', 'prompt', 'extraction', 'v1.0.0')
 
       expect(result.ok).toBe(false)
       if (!result.ok) {
-        expect(result.error.kind).toBe('tag_exists')
-        expect(result.error.tag).toBe('v1.0.0')
+        expect(result.error.kind).toBe('invalid_version')
       }
     })
   })
 
   describe('getTagSHA', () => {
-    it('should return ok result with SHA for existing tag', async () => {
+    it('should return ok result with SHA', async () => {
       vi.mocked(mockGit.exec).mockResolvedValue({
-        stdout: 'abc1234567890def',
-        stderr: '',
         exitCode: 0,
+        stdout: 'abc123def456',
+        stderr: '',
       })
 
-      const result = await tagManager.getTagSHA('my-prompt', 'v1.0.0', 'prompt')
+      const result = await tagManager.getTagSHA('components', 'prompt', 'extraction', 'v1.0.0')
 
       expect(result.ok).toBe(true)
       if (result.ok) {
-        expect(result.value).toBe('abc1234567890def')
+        expect(result.value).toBe('abc123def456')
       }
     })
 
     it('should return error for non-existent tag', async () => {
       vi.mocked(mockGit.exec).mockResolvedValue({
+        exitCode: 1,
         stdout: '',
-        stderr: 'fatal: ambiguous argument',
-        exitCode: 128,
+        stderr: 'not found',
       })
 
-      const result = await tagManager.getTagSHA('my-prompt', 'v99.0.0', 'prompt')
+      const result = await tagManager.getTagSHA('components', 'prompt', 'extraction', 'v99.0.0')
 
       expect(result.ok).toBe(false)
       if (!result.ok) {
         expect(result.error.kind).toBe('tag_not_found')
-        expect(result.error.tag).toBe('v99.0.0')
       }
     })
   })
@@ -101,16 +112,15 @@ describe('GitTagManagerResult', () => {
   describe('getTagInfo', () => {
     it('should return ok result with tag info', async () => {
       vi.mocked(mockGit.exec).mockResolvedValue({
+        exitCode: 0,
         stdout: 'abc123|2024-01-15|Release v1.0.0|Test Author',
         stderr: '',
-        exitCode: 0,
       })
 
-      const result = await tagManager.getTagInfo('my-prompt', 'v1.0.0', 'prompt')
+      const result = await tagManager.getTagInfo('components/prompts/extraction/v1.0.0')
 
       expect(result.ok).toBe(true)
       if (result.ok) {
-        expect(result.value.tag).toBe('v1.0.0')
         expect(result.value.sha).toBe('abc123')
         expect(result.value.author).toBe('Test Author')
       }
@@ -118,12 +128,12 @@ describe('GitTagManagerResult', () => {
 
     it('should return error for non-existent tag', async () => {
       vi.mocked(mockGit.exec).mockResolvedValue({
+        exitCode: 0,
         stdout: '',
         stderr: '',
-        exitCode: 0,
       })
 
-      const result = await tagManager.getTagInfo('my-prompt', 'v99.0.0', 'prompt')
+      const result = await tagManager.getTagInfo('components/prompts/extraction/v99.0.0')
 
       expect(result.ok).toBe(false)
       if (!result.ok) {
@@ -132,60 +142,50 @@ describe('GitTagManagerResult', () => {
     })
   })
 
-  describe('resolveRef', () => {
+  describe('resolveRefToSHA', () => {
     it('should return ok result for valid ref', async () => {
-      // SHA resolution
       vi.mocked(mockGit.exec).mockResolvedValue({
-        stdout: 'abc1234567890def1234567890abcdef12345678',
-        stderr: '',
         exitCode: 0,
+        stdout: 'abc123def456',
+        stderr: '',
       })
 
-      const result = await tagManager.resolveRef('my-prompt', 'abc123', 'prompt')
+      const result = await tagManager.resolveRefToSHA('HEAD')
 
       expect(result.ok).toBe(true)
       if (result.ok) {
-        expect(result.value).toMatch(/^[a-f0-9]{40}$/)
+        expect(result.value).toBe('abc123def456')
       }
     })
 
     it('should return error for invalid ref', async () => {
       vi.mocked(mockGit.exec).mockResolvedValue({
+        exitCode: 1,
         stdout: '',
-        stderr: 'fatal: bad revision',
-        exitCode: 128,
+        stderr: 'bad revision',
       })
 
-      const result = await tagManager.resolveRef('my-prompt', 'invalid-ref', 'prompt')
+      const result = await tagManager.resolveRefToSHA('invalid')
 
       expect(result.ok).toBe(false)
       if (!result.ok) {
         expect(result.error.kind).toBe('invalid_ref')
-        expect(result.error.ref).toBe('invalid-ref')
       }
     })
   })
 
   describe('getFileAtTag', () => {
     it('should return ok result with file content', async () => {
-      // First call for SHA resolution
-      vi.mocked(mockGit.exec).mockResolvedValueOnce({
-        stdout: 'abc123',
-        stderr: '',
-        exitCode: 0,
-      })
-      // Second call for file content
-      vi.mocked(mockGit.exec).mockResolvedValueOnce({
-        stdout: 'File content here',
-        stderr: '',
-        exitCode: 0,
-      })
+      vi.mocked(mockGit.exec)
+        .mockResolvedValueOnce({ exitCode: 0, stdout: 'abc123', stderr: '' }) // getTagSHA
+        .mockResolvedValueOnce({ exitCode: 0, stdout: 'File content here', stderr: '' }) // show file
 
       const result = await tagManager.getFileAtTag(
-        'my-prompt',
+        'components',
+        'prompt',
+        'extraction',
         'v1.0.0',
-        'prompts/test.md',
-        'prompt'
+        'prompts/test.md'
       )
 
       expect(result.ok).toBe(true)
@@ -195,30 +195,21 @@ describe('GitTagManagerResult', () => {
     })
 
     it('should return error for non-existent file', async () => {
-      // SHA resolution succeeds
-      vi.mocked(mockGit.exec).mockResolvedValueOnce({
-        stdout: 'abc123',
-        stderr: '',
-        exitCode: 0,
-      })
-      // File content fails
-      vi.mocked(mockGit.exec).mockResolvedValueOnce({
-        stdout: '',
-        stderr: 'fatal: path not found',
-        exitCode: 128,
-      })
+      vi.mocked(mockGit.exec)
+        .mockResolvedValueOnce({ exitCode: 0, stdout: 'abc123', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'path not found' })
 
       const result = await tagManager.getFileAtTag(
-        'my-prompt',
+        'components',
+        'prompt',
+        'extraction',
         'v1.0.0',
-        'nonexistent.md',
-        'prompt'
+        'nonexistent.md'
       )
 
       expect(result.ok).toBe(false)
       if (!result.ok) {
         expect(result.error.kind).toBe('file_not_found')
-        expect(result.error.path).toBe('nonexistent.md')
       }
     })
   })
@@ -226,24 +217,24 @@ describe('GitTagManagerResult', () => {
   describe('deleteTag', () => {
     it('should return ok result for successful deletion', async () => {
       vi.mocked(mockGit.exec).mockResolvedValue({
+        exitCode: 0,
         stdout: '',
         stderr: '',
-        exitCode: 0,
       })
 
-      const result = await tagManager.deleteTag('my-prompt', 'v1.0.0', 'prompt')
+      const result = await tagManager.deleteTag('components', 'prompt', 'extraction', 'v1.0.0')
 
       expect(result.ok).toBe(true)
     })
 
     it('should return error for non-existent tag', async () => {
       vi.mocked(mockGit.exec).mockResolvedValue({
-        stdout: '',
-        stderr: 'error: tag not found',
         exitCode: 1,
+        stdout: '',
+        stderr: 'tag not found',
       })
 
-      const result = await tagManager.deleteTag('my-prompt', 'v99.0.0', 'prompt')
+      const result = await tagManager.deleteTag('components', 'prompt', 'extraction', 'v99.0.0')
 
       expect(result.ok).toBe(false)
       if (!result.ok) {
@@ -262,28 +253,27 @@ describe('GitTagManagerResult', () => {
   })
 
   describe('passthrough methods', () => {
-    it('listTags should work', async () => {
-      vi.mocked(mockGit.exec).mockResolvedValue({
-        stdout: 'prompts/my-prompt/v1.0.0\nprompts/my-prompt/v1.1.0',
-        stderr: '',
-        exitCode: 0,
-      })
-
-      const tags = await tagManager.listTags('my-prompt', 'prompt')
-
-      expect(tags).toEqual(['v1.0.0', 'v1.1.0'])
-    })
-
     it('tagExists should work', async () => {
       vi.mocked(mockGit.exec).mockResolvedValue({
-        stdout: 'abc123',
-        stderr: '',
         exitCode: 0,
+        stdout: 'components/prompts/extraction/v1.0.0',
+        stderr: '',
       })
 
-      const exists = await tagManager.tagExists('my-prompt', 'v1.0.0', 'prompt')
+      const exists = await tagManager.tagExists('components', 'prompt', 'extraction', 'v1.0.0')
 
       expect(exists).toBe(true)
+    })
+
+    it('isVersionSlot should work', () => {
+      expect(tagManager.isVersionSlot('v1.0.0')).toBe(true)
+      expect(tagManager.isVersionSlot('staging')).toBe(false)
+    })
+
+    it('buildTagPath should work', () => {
+      expect(tagManager.buildTagPath('components', 'prompt', 'extraction', 'v1.0.0')).toBe(
+        'components/prompts/extraction/v1.0.0'
+      )
     })
   })
 })
