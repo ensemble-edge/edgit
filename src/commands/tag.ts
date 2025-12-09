@@ -1,5 +1,5 @@
 import { Command } from './base.js'
-import type { GitTagManager, EntityType, TagPrefix, ExtendedTagInfo } from '../utils/git-tags.js'
+import type { GitTagManager, EntityType, TagPrefix } from '../utils/git-tags.js'
 import { createGitTagManager } from '../utils/git-tags.js'
 import type { ComponentRegistry, ComponentType } from '../models/components.js'
 import { ComponentUtils } from '../models/components.js'
@@ -57,7 +57,7 @@ export class TagCommand extends Command {
 
   async execute(args: string[]): Promise<void> {
     if (args.length === 0) {
-      await this.showHelp()
+      this.showHelp()
       return
     }
 
@@ -137,7 +137,7 @@ export class TagCommand extends Command {
       console.log(`✅ Created version tag: ${componentName}@${tagName}`)
       console.log(`   Git tag: ${gitTag}`)
       if (sha) console.log(`   SHA: ${sha}`)
-      console.log(`\n💡 Push with: edgit push --tags`)
+      console.log('\n💡 Push with: edgit push --tags')
     } catch (error) {
       if (error instanceof Error && error.message.includes('already exists')) {
         throw new EdgitError(
@@ -495,7 +495,8 @@ export class TagCommand extends Command {
       if (standalone) {
         throw EdgitError.from(error, 'GIT_ERROR')
       }
-      console.log(`   ⚠️ Failed to list tags: ${error instanceof Error ? error.message : error}`)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.log(`   ⚠️ Failed to list tags: ${errorMessage}`)
     }
   }
 
@@ -503,7 +504,7 @@ export class TagCommand extends Command {
     const registryPath = path.join(process.cwd(), '.edgit', 'components.json')
     try {
       const content = await fs.readFile(registryPath, 'utf-8')
-      return JSON.parse(content)
+      return JSON.parse(content) as ComponentRegistry
     } catch {
       return ComponentUtils.createEmptyRegistry()
     }
@@ -543,7 +544,7 @@ DEPLOYMENT WORKFLOW:
 `
   }
 
-  private async showHelp(): Promise<void> {
+  private showHelp(): void {
     console.log(this.getHelp())
   }
 }
