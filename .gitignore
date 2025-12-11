@@ -24,8 +24,8 @@ build/
 *~
 
 # Local planning and notes (not committed)
-.planning/todos/  # Personal task lists stay local
-.planning/todos/*
+.planning/todos/       # All todos stay local (WIP, complete, everything)
+.planning/testing/     # Internal testing notes
 .local/
 .dev-notes/
 
