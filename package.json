@@ -52,7 +52,7 @@
     "@changesets/cli": "^2.29.7",
     "@types/node": "^24.9.2",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "@typescript-eslint/parser": "^7.0.0",
+    "@typescript-eslint/parser": "^8.49.0",
     "@vitest/coverage-v8": "^4.0.6",
     "eslint": "^8.57.0",
     "prettier": "^3.2.5",
