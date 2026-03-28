@@ -46,7 +46,7 @@
     "versioning",
     "cli"
   ],
-  "author": "Higher Order Capital",
+  "author": "Ensemble Edge AI LLC",
   "license": "MIT",
   "devDependencies": {
     "@changesets/cli": "^2.29.7",
